@@ -1,0 +1,18 @@
+[
+  {"id": "NZFX", "name": "Phoenix Airfield (NZFX)", "lat": -77.956, "lon": 166.766, "metar": ["NZFX", "NZCM"], "taf": "NZFX"},
+  {"id": "NZWD", "name": "Williams Field (NZWD)", "lat": -77.868, "lon": 167.057, "metar": ["NZWD", "NZCM"], "taf": "NZWD"},
+  {"id": "MCM", "name": "McMurdo Station", "lat": -77.846, "lon": 166.676, "metar": "NZCM", "taf": null},
+  {"id": "SCOTTBASE", "name": "Scott Base", "lat": -77.849, "lon": 166.768, "metar": "NZCM", "taf": null},
+  {"id": "MARBLE", "name": "Marble Point", "lat": -77.414, "lon": 163.679, "metar": null, "taf": null},
+  {"id": "NZSP", "name": "South Pole (NZSP)", "lat": -90.0, "lon": 0.0, "metar": "NZSP", "taf": "NZSP"},
+  {"id": "NZTB", "name": "Terra Nova Bay (NZTB)", "lat": -74.694, "lon": 164.113, "metar": "NZTB", "taf": null},
+  {"id": "CONCORDIA", "name": "Concordia Station (Dome C)", "lat": -75.100, "lon": 123.333, "metar": null, "taf": null},
+  {"id": "YCSK", "name": "Casey (YCSK)", "lat": -66.282, "lon": 110.528, "metar": "YCSK", "taf": "YCSK"},
+  {"id": "YWKS", "name": "Wilkins Aerodrome (YWKS)", "lat": -66.691, "lon": 111.524, "metar": "YWKS", "taf": "YWKS"},
+  {"id": "DAVIS", "name": "Davis Station", "lat": -68.577, "lon": 77.967, "metar": null, "taf": null},
+  {"id": "MAWSON", "name": "Mawson Station", "lat": -67.603, "lon": 62.874, "metar": null, "taf": null},
+  {"id": "NOVO", "name": "Novolazarevskaya Station", "lat": -70.777, "lon": 11.824, "metar": null, "taf": null},
+  {"id": "TROLL", "name": "Troll Airfield", "lat": -71.957, "lon": 2.465, "metar": null, "taf": null},
+  {"id": "UNIONGL", "name": "Union Glacier", "lat": -79.777, "lon": -83.321, "metar": null, "taf": null},
+  {"id": "ROTHERA", "name": "Rothera", "lat": -67.568, "lon": -68.127, "metar": null, "taf": null}
+]

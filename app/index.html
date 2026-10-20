@@ -1,0 +1,1632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Antarctic Forecast Collator</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f2f1ed;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --accent: #2a78d6;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --obs: #0b0b0b;
+  --now-bg: #e4e3dc;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --obs: #f0efec;
+    --now-bg: #3a3a36;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --accent: #3987e5;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --obs: #f0efec;
+  --now-bg: #3a3a36;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px 48px; }
+header.bar {
+  position: sticky; top: 0; z-index: 5; background: var(--page);
+  border-bottom: 1px solid var(--border); margin: 0 -16px 16px; padding: 10px 16px;
+}
+@media (max-width: 600px) {
+  header.bar { position: static; }
+  header.bar h1 { flex-basis: 100%; }
+  header.bar .spacer { display: none; }
+  header.bar #loc { min-width: 0; width: 0; flex: 1 1 0; }
+}
+.bar-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+h1 { font-size: 16px; margin: 0 4px 0 0; white-space: nowrap; font-weight: 650; letter-spacing: -0.01em; }
+select, input, button {
+  font: inherit; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-height: 36px;
+}
+button { cursor: pointer; }
+button:hover { background: var(--surface-2); }
+#loc { min-width: 190px; max-width: 100%; }
+.custom { display: none; gap: 6px; align-items: center; }
+.custom.on { display: flex; }
+.custom input { width: 104px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: var(--surface); min-height: 34px; padding: 6px 11px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+.spacer { flex: 1; }
+.offset { display: inline-flex; align-items: center; gap: 4px; }
+.offset-l { font-size: 13px; color: var(--ink-2); margin-right: 2px; }
+.offset select { padding-right: 6px; }
+.lt { color: var(--ink-2); }
+.meta { color: var(--muted); font-size: 12.5px; }
+#refresh { width: 36px; padding: 0; font-size: 18px; }
+.meta b { color: var(--ink); font-weight: 600; }
+
+section { margin: 0 0 28px; }
+h2 { font-size: 15px; font-weight: 650; margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 small { font-weight: 400; color: var(--muted); font-size: 13px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+.obs-head { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }
+.stat .v { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.stat .l { font-size: 12px; color: var(--muted); }
+.raw { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; }
+.label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 2px; }
+
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); font-size: 14px; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+tr.summary td { color: var(--ink-2); border-bottom: 0; font-size: 13px; }
+tr.summary td:first-child { color: var(--ink); font-weight: 600; }
+td.na { color: var(--muted); }
+td.far { box-shadow: inset 0 -2px 0 var(--ink-2); }
+.key { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 8px; border-radius: 2px; }
+.model-name { font-weight: 500; }
+button.model-name { font: inherit; font-weight: 500; color: var(--ink); background: none; border: 0; padding: 0; min-height: 0;
+  text-decoration: underline dotted var(--muted); text-underline-offset: 3px; cursor: pointer; }
+button.model-name:hover { color: var(--accent); background: none; }
+#modelInfo { max-width: 560px; width: calc(100% - 32px); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 14px;
+  background: var(--surface); color: var(--ink); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+#modelInfo::backdrop { background: rgba(0,0,0,.35); }
+#modelInfo h3 { margin: 0 28px 4px 0; font-size: 17px; display: flex; align-items: center; }
+#modelInfo h3 .key { flex-shrink: 0; }
+#modelInfo h4 { margin: 12px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+#modelInfo p { margin: 6px 0; font-size: 14px; }
+#modelInfo .mi-who { color: var(--ink-2); font-size: 13px; }
+#modelInfo ul { margin: 0; padding-left: 18px; font-size: 14px; }
+#modelInfo li { margin: 3px 0; }
+#modelInfo .mi-close { position: absolute; top: 10px; right: 10px; width: 32px; min-height: 32px; padding: 0; border-radius: 8px; }
+.run { color: var(--muted); font-size: 12px; margin-left: 6px; }
+
+.risk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+.risk i { font-style: normal; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #0b0b0b; }
+.r0 i { background: transparent; color: var(--muted); }
+.r1 i { background: var(--warning); }
+.r2 i { background: var(--serious); }
+.r3 i { background: var(--critical); color: #fff; }
+
+.vars { margin-bottom: 10px; flex-wrap: wrap; }
+.wins { margin-bottom: 8px; flex-wrap: wrap; }
+.wins button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.win-badge { display: inline-block; background: var(--accent); color: #fff; border-radius: 6px; padding: 1px 8px;
+  font-size: 12px; font-weight: 600; }
+.win-badge[hidden] { display: none; }
+tr.drow th { color: var(--ink-2); font-weight: 600; text-align: left; padding-top: 2px; white-space: nowrap; }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12.5px; min-width: 170px; box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  display: none; z-index: 3; font-variant-numeric: tabular-nums;
+}
+.tip .t { color: var(--ink-2); margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 6px; }
+.tip .row b { min-width: 52px; text-align: right; font-weight: 600; color: var(--ink); }
+.tip .row span { color: var(--ink-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; font-size: 13px; }
+.legend button { background: none; border: 0; padding: 4px 2px; min-height: 28px; color: var(--ink-2); display: inline-flex; align-items: center; }
+.legend button[aria-pressed="false"] { opacity: .35; }
+.legend-all { display: inline-flex; gap: 6px; margin-right: 6px; }
+.legend button.mini { border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; min-height: 26px; font-size: 12px; color: var(--ink); }
+.legend button.mini:hover { background: var(--surface-2); }
+.legend-item { display: inline-flex; align-items: center; }
+.legend button.only { font-size: 11px; color: var(--accent); padding: 2px 4px; min-height: 26px; visibility: hidden; }
+.legend-item:hover button.only, .legend-item:focus-within button.only { visibility: visible; }
+@media (hover: none) { .legend button.only { visibility: visible; } }
+.var-help { display: grid; grid-template-columns: 1fr; gap: 2px; margin: 12px 0 0; padding-top: 10px;
+  border-top: 1px solid var(--grid); font-size: 12.5px; color: var(--muted); }
+.var-help dt { font-weight: 600; color: var(--ink-2); }
+.var-help dd { margin: 0; }
+.var-help dd { color: var(--ink-2); }
+details.values { margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; }
+details.values summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+details.values summary span { font-weight: 400; color: var(--muted); }
+details.values .tbl-wrap { margin-top: 8px; }
+.trend-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.trend-model { font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
+.rg-title { font-size: 16px; margin: 0 0 4px; }
+table.rungrid { border-collapse: separate; border-spacing: 3px; width: auto; }
+table.rungrid th, table.rungrid td { border: 0; padding: 0; text-align: center; }
+table.rungrid th { font-size: 11px; padding: 0 2px; }
+table.rungrid tbody th { text-align: right; padding-right: 8px; font-size: 12.5px; font-weight: 400; color: var(--ink-2); white-space: nowrap;
+  position: sticky; left: 0; background: var(--surface); z-index: 1; }
+table.rungrid tbody tr:last-child th { font-weight: 700; color: var(--ink); }
+table.rungrid thead th:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+table.rungrid .day-alt { background: var(--surface-2); }
+table.rungrid .cell { width: 46px; height: 38px; border-radius: 5px; display: grid; place-items: center; align-content: center;
+  font-size: 13px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+table.rungrid .cell small { display: block; font-size: 9.5px; font-weight: 500; opacity: .9; }
+table.rungrid .cell .arrow { display: inline-block; margin-right: 2px; font-weight: 400; }
+table.rungrid .cell.empty { border: 1px dashed var(--grid); }
+table.rungrid .cell.interp { font-style: italic; }
+.rg-key { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12.5px; color: var(--ink-2); flex-wrap: wrap; }
+.rg-key .ramp { display: inline-flex; height: 12px; border-radius: 3px; overflow: hidden; }
+.rg-key .ramp span { width: 22px; }
+#trendTable td.interp { color: var(--muted); font-style: italic; }
+#trendTable td.delta-up { color: var(--critical); font-weight: 600; }
+#trendTable td.delta-down { color: var(--accent); font-weight: 600; }
+.legend .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--obs); margin-right: 8px; }
+.note { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+
+.heat td { padding: 0; border: 0; }
+.heat td:first-child { padding: 3px 10px 3px 0; font-size: 13px; }
+/* same label-column width in every grid so the hour columns line up from one grid to the next */
+.heat td:first-child, .heat th:first-child { width: 150px; min-width: 150px; max-width: 150px; box-sizing: border-box; }
+.heat td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heat .c { width: 22px; height: 22px; margin: 1px; border-radius: 4px; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #0b0b0b; background: var(--surface-2); }
+.heat .c.nd { background: transparent; color: var(--muted); font-weight: 400; }
+.heat .c.r1 { background: var(--warning); }
+.heat .c.r2 { background: var(--serious); }
+.heat .c.r3 { background: var(--critical); color: #fff; }
+.heat .c.g { background: var(--good); color: #fff; }
+.heat.wide .c { width: 34px; height: 28px; font-size: 10.5px; font-weight: 600; line-height: 1.05; text-align: center; }
+.heat.wide .c small { display: block; font-size: 8.5px; font-weight: 500; opacity: .9; }
+.heat .c[data-m] { cursor: default; }
+.elem-card { margin-bottom: 14px; }
+.elem-card h3 { font-size: 14px; font-weight: 650; margin: 0 0 2px; }
+.elem-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); margin: 0 0 8px; }
+.elem-key .risk i { width: 14px; height: 14px; font-size: 10px; }
+#gridTip { position: fixed; z-index: 20; pointer-events: none; display: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.14); min-width: 220px; font-variant-numeric: tabular-nums; }
+#gridTip .t { color: var(--ink-2); margin-bottom: 6px; }
+#gridTip .row { display: grid; grid-template-columns: 18px 76px 1fr; align-items: center; gap: 4px; margin: 2px 0; }
+#gridTip .row b { font-weight: 600; }
+#gridTip .row .na { color: var(--muted); }
+#gridTip .sw { width: 14px; height: 14px; border-radius: 3px; display: grid; place-items: center; font-size: 9.5px; font-weight: 700; color: #0b0b0b; }
+#gridTip .sw.g { background: var(--good); color: #fff; } #gridTip .sw.r1 { background: var(--warning); } #gridTip .sw.r3 { background: var(--critical); color: #fff; }
+#gridTip .sw.nd { border: 1px solid var(--axis); }
+#gridTip .overall { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--grid); font-weight: 600; }
+.risk.g i { background: var(--good); color: #fff; }
+.heat th { font-size: 10.5px; padding: 0; text-align: center; border: 0; }
+.heat tr.lrow th { padding-bottom: 4px; font-weight: 400; }
+tr.lrow th { color: var(--muted); font-weight: 400; padding-top: 0; }
+thead tr:first-child th { border-bottom: 0; padding-bottom: 0; color: var(--ink-2); }
+th.nowcol { color: var(--ink) !important; font-weight: 700; background: var(--now-bg); }
+thead tr:first-child th.nowcol { border-radius: 6px 6px 0 0; }
+thead tr.lrow th.nowcol { border-radius: 0 0 6px 6px; }
+.heat .nowcol .c { outline: 1.5px solid var(--ink); outline-offset: -1px; }
+.loading { opacity: .5; transition: opacity .2s; }
+.err { color: var(--critical); font-size: 13px; }
+.offsite { color: var(--critical); font-weight: 600; }
+.age-badge { display: inline-block; border-radius: 4px; padding: 0 6px; margin-left: 6px; font-size: 11.5px; font-weight: 600; font-family: system-ui, -apple-system, sans-serif; }
+.age-badge.stale { background: var(--warning); color: #0b0b0b; }
+.age-badge.old { background: var(--critical); color: #fff; }
+.obs-head.dim { opacity: .5; }
+#taf .status { font: 12.5px/1.45 system-ui, -apple-system, sans-serif; color: var(--muted); margin-bottom: 6px; white-space: normal; }
+.offsite-badge { display: inline-block; color: #fff; background: var(--critical); border-radius: 4px; padding: 0 5px; font-size: 11.5px; font-weight: 600; margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="bar-row">
+      <h1>Antarctic Forecast Collator</h1>
+      <select id="loc" aria-label="Location"></select>
+      <div class="custom" id="custom">
+        <input id="lat" inputmode="decimal" placeholder="Lat −77.95" aria-label="Latitude">
+        <input id="lon" inputmode="decimal" placeholder="Lon 166.77" aria-label="Longitude">
+        <button id="go">Go</button>
+      </div>
+      <span class="spacer"></span>
+      <div class="offset" role="group" aria-label="Local time offset from UTC">
+        <span class="offset-l" title="Local time (L) offset from UTC">L</span>
+        <select id="off" aria-label="UTC offset"></select>
+      </div>
+      <button id="refresh" aria-label="Refresh data" title="Refresh data">↻</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section>
+      <h2>Now <small id="nowTime"></small><small class="meta" id="meta">Loading…</small></h2>
+      <div class="grid2">
+        <div class="card" id="obsCard"><div class="label">Observed</div><div id="obs">—</div></div>
+        <div class="card"><div class="label">TAF</div><div id="taf" class="raw">—</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Model comparison <small>at the current hour</small></h2>
+      <div class="card tbl-wrap"><table id="nowTable"></table></div>
+      <div class="note">Tap or click a model name for a short profile of the model. Underlined values differ from the model median by more than the set threshold (wind 10 kt, temperature 4 °C, cloud 40 %). BLSN is a derived risk (see below), not a model output.</div>
+    </section>
+
+    <section>
+      <h2>Forecast <small id="winNote"></small></h2>
+      <div class="seg wins" id="wins" role="group" aria-label="Forecast window"></div>
+      <div class="seg vars" id="vars" role="group" aria-label="Variable"></div>
+      <div class="card">
+        <div class="chart" id="chart"></div>
+        <div class="legend" id="legend"></div>
+        <div class="note" id="chartNote"></div>
+        <dl class="var-help" id="varHelp"></dl>
+        <details class="values">
+          <summary>Show values <span id="tableVar"></span></summary>
+          <div class="tbl-wrap"><table id="hourTable"></table></div>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <h2>Flight Conditions Overview <small>by model and hour · hover or tap a cell for the data</small><span class="win-badge" hidden></span></h2>
+      <div class="card tbl-wrap"><table class="heat wide" id="ops"></table>
+        <div class="legend" aria-label="Category key">
+          <span class="risk g"><i>✓</i>Green: all of vis ≥ 9999 m, nil precip, cloud ≥ 3000 ft, wind &lt; 20 kt and gusts &lt; 20 kt, temp ≥ −35 °C</span>
+          <span class="risk r1"><i>!</i>Yellow: vis 5000–9998 m, nil precip, cloud 1000–2999 ft, wind 20–40 kt or gusts 20–40 kt, temp −43 to below −35 °C</span>
+          <span class="risk r3"><i>✕</i>Red: any of vis &lt; 5000 m, precip, cloud &lt; 1000 ft, wind or gusts &gt; 40 kt, temp &lt; −43 °C</span>
+        </div>
+        <div class="note">Each element is judged only where the model provides it; hover or tap a cell to see every value and what set the colour. Visibility comes from ECMWF IFS, GFS, UKMO and AMPS only (AMPS from falling snow, so blowing snow isn't included). Cloud base: AMPS gives its own; for the other models it's inferred from the forecast sounding (lowest level reaching ice saturation, ignoring the lowest ~100 m). ECMWF IFS uses its 0.25° profile. "≤" means saturated at the lowest usable level. Low-cloud cover is the fallback where no profile exists. Any precip (≥ 0.01 mm/h water equivalent) is red; nil means &lt; 0.01 mm/h.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Flight conditions by element <small>value in each cell, coloured by that element alone</small></h2>
+      <div id="elemGrids"></div>
+    </section>
+
+    <section>
+      <h2>Blowing snow risk <small>by model and hour</small><span class="win-badge" hidden></span></h2>
+      <div class="card tbl-wrap"><table class="heat wide" id="blsn"></table>
+        <div class="legend" aria-label="Risk key">
+          <span class="risk r1"><i>!</i>Possible</span>
+          <span class="risk r2"><i>▲</i>Likely</span>
+          <span class="risk r3"><i>■</i>Heavy</span>
+        </div>
+        <div class="note">Derived from 10 m wind and temperature using the Li &amp; Pomeroy (1997) dry-snow transport threshold U<sub>t</sub> = 9.43 + 0.18T + 0.0033T² m/s. Possible: wind within 2 m/s of threshold, or gusts above it. Likely: wind above threshold. Heavy: wind ≥ threshold + 5 m/s. Untuned for Ross Island — the verification work will calibrate it.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Run-to-run trend <small>how successive runs have forecast the next 12 h</small></h2>
+      <div class="trend-controls">
+        <label class="trend-model">Model <select id="trendModel" aria-label="Model for run-to-run trend"></select></label>
+        <div class="seg" id="trendVars" role="group" aria-label="Trend variable"></div>
+      </div>
+      <div class="card">
+        <div class="chart" id="trendChart"></div>
+        <div class="legend" id="trendLegend"></div>
+        <div class="note" id="trendNote"></div>
+        <details class="values">
+          <summary>Show values <span>· next 12 h by run, with the change from the previous run</span></summary>
+          <div class="tbl-wrap"><table id="trendTable"></table></div>
+        </details>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3 class="rg-title" id="runGridTitle"></h3>
+        <div class="note" id="runGridNote" style="margin-top:0"></div>
+        <div class="tbl-wrap"><table class="rungrid" id="runGrid"></table></div>
+        <div class="rg-key" id="runGridKey"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+"use strict";
+// ---------- configuration ----------
+const MODELS = [
+  { id: "amps",  label: "AMPS", src: "amps" },
+  { id: "ecmwf_ifs", label: "ECMWF IFS 9 km", meta: "ecmwf_ifs" },
+  { id: "gfs_global", label: "GFS 0.25°", meta: "ncep_gfs025" },
+  { id: "icon_global", label: "ICON 13 km", meta: "dwd_icon" },
+  { id: "ukmo_global_deterministic_10km", label: "UKMO 10 km", meta: "ukmo_global_deterministic_10km" },
+  { id: "gem_global", label: "GEM 15 km", meta: "cmc_gem_gdps_15km" },
+  { id: "meteofrance_arpege_world", label: "ARPEGE 0.25°", meta: "meteofrance_arpege_world025" },
+  { id: "ecmwf_aifs025_single", label: "ECMWF AIFS (AI)", meta: "ecmwf_aifs025_single" },
+];
+MODELS.forEach((m, i) => m.color = `var(--s${i + 1})`);
+
+// Short profiles shown when a model name is clicked. General characteristics only; which model is
+// most reliable for each element at each site is for the verification archive to establish.
+const MODEL_INFO = {
+  amps: {
+    name: "AMPS — Antarctic Mesoscale Prediction System",
+    who: "Polar WRF run by NCAR (UCAR) for the US Antarctic Program.",
+    what: "A regional model with physics tuned for polar conditions, nested down to ~0.85 km over Ross Island. Coarser nests cover the rest of the continent (~2.6 km and ~7.7 km here, the 7.7 km one 3-hourly). Runs at 00Z and 12Z, out to several days.",
+    good: ["Finest resolution available here: resolves Ross Island terrain, katabatic and barrier winds, and local channelling.", "Built specifically for Antarctic forecasting and widely used by forecasters on the ice."],
+    limits: ["The fine nests (0.85 and 2.6 km) only run to +39 h. After that this page switches to the 7.7 km domain (3-hourly, to +120 h), so detail drops sharply from day 2.",
+      "Only two runs a day, available roughly 8–10 h after run time, so it's often older than the global models.", "A regional model: it starts from, and is driven at its edges by, a global model (GFS), so it inherits that model's large-scale errors.", "The 7.7 km domain is 3-hourly; this page interpolates between those hours."],
+    here: ["No gust or cloud-cover fields in the GRIB, so gust-based ratings can't apply.", "Cloud base is the model's own cloud-base field.", "Visibility is estimated from falling snow only (Stoelinga & Warner), so blowing snow and fog are not included."],
+  },
+  ecmwf_ifs: {
+    name: "ECMWF IFS — European Centre HRES (9 km)",
+    who: "European Centre for Medium-Range Weather Forecasts.",
+    what: "Global model at ~9 km with advanced data assimilation. Four runs a day (00/06/12/18Z).",
+    good: ["Generally the most skilful global model for large-scale patterns and synoptic timing.", "Good handling of approaching systems a few days out."],
+    limits: ["9 km smooths steep coastal terrain, so local katabatic and topographic winds can be under-done.", "Like all global models, low cloud and fog over ice are hard to represent."],
+    here: ["Visibility comes from the 9 km feed.", "Cloud base is inferred from the 0.25° IFS sounding (only 1000/925/850/700 hPa are available), so low bases are coarsely resolved."],
+  },
+  gfs_global: {
+    name: "GFS — NOAA Global Forecast System",
+    who: "NOAA/NCEP (USA).",
+    what: "Global model at ~13 km, served here on a 0.25° grid. Four runs a day. AMPS starts from GFS.",
+    good: ["Frequent, fast updates.", "Many output fields, including visibility and gusts."],
+    limits: ["Known boundary-layer and low-cloud biases over polar ice surfaces.", "Its visibility is a crude diagnostic and often too low or too high in polar conditions."],
+    here: ["Cloud base from the forecast sounding. Early checks at Ross Island suggest it saturates too low, giving low bases; the verification will confirm or refute this."],
+  },
+  icon_global: {
+    name: "ICON — DWD global (13 km)",
+    who: "Deutscher Wetterdienst (Germany).",
+    what: "Global model on an icosahedral grid at ~13 km. Four runs a day.",
+    good: ["Well-regarded global model with good large-scale skill.", "Full vertical profile available, so the sounding-based cloud base is well resolved."],
+    limits: ["13 km resolution misses local terrain effects.", "No visibility output on this feed."],
+    here: ["Cloud base from the forecast sounding (1000–500 hPa)."],
+  },
+  ukmo_global_deterministic_10km: {
+    name: "UKMO — Met Office Unified Model global (10 km)",
+    who: "UK Met Office.",
+    what: "Global deterministic model at ~10 km. Several runs a day.",
+    good: ["Strong global model, often close to ECMWF in skill.", "Provides visibility and gusts."],
+    limits: ["10 km resolution still smooths coastal terrain.", "Some fields arrive later than the other models."],
+    here: ["Cloud base from the forecast sounding (1000–500 hPa)."],
+  },
+  gem_global: {
+    name: "GEM — Environment Canada global (15 km)",
+    who: "Environment and Climate Change Canada.",
+    what: "Global Deterministic Prediction System at ~15 km. Runs twice a day (00/12Z).",
+    good: ["An independent model: useful as a check when the others agree for the same reasons."],
+    limits: ["Coarser than most others here.", "No 975 hPa level, so the lowest part of the sounding is thin."],
+    here: ["Cloud base from the forecast sounding. Early checks found it rarely reaches ice saturation (too dry), so it may under-forecast low cloud."],
+  },
+  meteofrance_arpege_world: {
+    name: "ARPEGE — Météo-France global",
+    who: "Météo-France.",
+    what: "A stretched-grid global model: finest over France (~5 km) and coarsest on the opposite side of the globe, which includes Antarctica. Served here at 0.25°. Four runs a day.",
+    good: ["Another independent model for checking consensus."],
+    limits: ["Its effective resolution over Antarctica is among the coarsest here, because of the stretched grid.", "No visibility output on this feed."],
+    here: ["Cloud base from the forecast sounding. Early checks suggest low bases at Ross Island."],
+  },
+  ecmwf_aifs025_single: {
+    name: "ECMWF AIFS — machine-learning model",
+    who: "ECMWF.",
+    what: "An AI (machine-learning) global model trained on ECMWF reanalysis and analyses, at 0.25°. Four runs a day.",
+    good: ["Strong large-scale skill in global verification, sometimes beating the physics-based IFS for track and pattern.", "A different method, so useful as an independent opinion."],
+    limits: ["Fields are smoother; small-scale features and extremes tend to be damped.", "Fewer outputs: no gusts or visibility here.", "Little published verification for Antarctic surface weather so far."],
+    here: ["Cloud base from its sounding (only 1000/925/850/700 hPa), so low bases are coarsely resolved."],
+  },
+};
+
+const VARS = [
+  { id: "wind_speed_10m", label: "Wind", unit: "kt", fmt: v => v.toFixed(0), floor: 0, far: 10 },
+  { id: "wind_direction_10m", label: "Wind dir", unit: "°", fmt: v => fmtDir(v), dir: true },
+  { id: "wind_speed_2000ft", label: "Wind 2000ft", unit: "kt", fmt: v => v.toFixed(0), floor: 0 },
+  { id: "wind_direction_2000ft", label: "Dir 2000ft", unit: "°", fmt: v => fmtDir(v), dir: true },
+  { id: "wind_gusts_10m", label: "Gust", unit: "kt", fmt: v => v.toFixed(0), floor: 0, far: 10 },
+  { id: "temperature_2m", label: "Temp", unit: "°C", fmt: v => v.toFixed(1), far: 4 },
+  { id: "cloud_base", label: "Cloud base", unit: "ft", fmt: v => v >= 10000 ? "10k+" : String(Math.round(v / 100) * 100), floor: 0, ceil: 10000,
+    get: r => r.cloud_base !== undefined ? (r.cloud_base == null ? null : r.cloud_base * 3.281)
+      : r.cloud_diag?.base != null ? r.cloud_diag.base * 3.281 : null },
+  { id: "cloud_cover_low", label: "Cloud<10kft", unit: "%", fmt: v => v.toFixed(0), floor: 0, ceil: 100, far: 40 },
+  { id: "cloud_cover", label: "Total cloud", unit: "%", fmt: v => v.toFixed(0), floor: 0, ceil: 100, far: 40 },
+  { id: "visibility", label: "Visibility", unit: "km", fmt: v => v >= 10 ? "10+" : v.toFixed(1), floor: 0, ceil: 10, scale: 0.001 },
+  { id: "precipitation", label: "Precip", unit: "mm/h", fmt: v => v.toFixed(2), floor: 0 },
+  { id: "pressure_msl", label: "MSLP", unit: "hPa", fmt: v => v.toFixed(0) },
+];
+// Plain-language definitions shown under the 24-hour chart
+const VAR_HELP = {
+  wind_speed_10m: "Mean wind at 10 m, in knots. Direction is in the tooltip. Observed: METAR mean wind.",
+  wind_direction_10m: "Direction the 10 m wind is blowing FROM, in degrees true (grid near the pole). Lines break where the direction crosses north (e.g. 350° to 010°) rather than drawing across the chart. Observed: METAR direction (variable winds are left out).",
+  wind_speed_2000ft: "Wind speed 2,000 ft (610 m) above the ground, in knots. Interpolated from each model's pressure-level winds, with the 10 m wind as the lowest point. ECMWF IFS and AIFS have few low levels (1000/925/850 hPa), so theirs is coarser. AMPS: from its pressure levels around 2,000 ft. No observations at this height.",
+  wind_direction_2000ft: "Direction of the 2,000 ft wind (blowing from), in degrees true. Compare with the surface direction to see turning with height, e.g. a katabatic or barrier flow under a different wind aloft. No observations at this height.",
+  wind_gusts_10m: "Strongest gust at 10 m expected in the hour, in knots. Not available from AMPS or AIFS.",
+  temperature_2m: "Air temperature at 2 m, in °C.",
+  cloud_base: "Height of the lowest cloud above the ground, in feet. AMPS: the model's own cloud base. Other models: the lowest level where the forecast sounding reaches ice saturation, ignoring the lowest ~100 m (a gap means no saturated layer below ~500 hPa, i.e. no low or mid cloud). ECMWF IFS and AIFS soundings have few levels, so low bases are coarse. Observed: METAR ceiling (lowest BKN, OVC or VV layer). Clipped at 10,000 ft.",
+  cloud_cover_low: "Percentage of the sky covered by cloud in the low layer, roughly the surface up to 2–3 km (≈ 6,500–10,000 ft). Each model defines the layer slightly differently (ECMWF: below 0.8 × surface pressure). It is an amount, not a height: 100 % at 8,000 ft looks the same as 100 % at 300 ft. Use Cloud base for height.",
+  cloud_cover: "Percentage of the sky covered by cloud at any level.",
+  visibility: "Horizontal visibility, in km, clipped at 10 km. Only ECMWF IFS, GFS and UKMO forecast it. AMPS is estimated from falling snow only (Stoelinga & Warner 1999), so it ignores blowing snow and fog. Observed: METAR prevailing visibility.",
+  precipitation: "Precipitation in the hour as water equivalent, in mm. Open-Meteo values are rounded to 0.1 mm.",
+  pressure_msl: "Pressure reduced to mean sea level, in hPa. Observed: METAR SLP. Meaningless on the high plateau (South Pole, Concordia), where it's extrapolated through ~3 km of ice.",
+};
+
+const OM_HOURLY = ["temperature_2m","wind_speed_10m","wind_direction_10m","wind_gusts_10m","cloud_cover","cloud_cover_low","visibility","precipitation","snowfall","pressure_msl"];
+
+// ---------- cloud base from forecast soundings ----------
+// Lowest height where the model profile reaches ice saturation (RHi >= CB_RHI). Pressure levels in the
+// lowest CB_MIN_AGL metres are skipped: near-surface air over snow is often ice-saturated without fog.
+// Heuristic, to be calibrated against observed cloud in the verification work.
+const PROFILE_LEVELS = [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500];
+const PROFILE_VARS = PROFILE_LEVELS.flatMap(l => [`temperature_${l}hPa`, `dew_point_${l}hPa`, `geopotential_height_${l}hPa`]);
+const PROFILE_FROM = { ecmwf_ifs: "ecmwf_ifs025" }; // IFS 9 km has no pressure levels on Open-Meteo; use IFS 0.25°
+const CB_RHI = 1.0, CB_MIN_AGL = 100;
+const WIND_LEVEL_VARS = PROFILE_LEVELS.flatMap(l => [`wind_speed_${l}hPa`, `wind_direction_${l}hPa`]);
+const AGL_2000FT = 609.6;
+// Wind at a height above ground (m) from the pressure-level profile, using the 10 m wind as the bottom point.
+// Interpolates u/v linearly in height between the levels either side. Returns { speed (kt), dir (deg) } or null.
+function windAtHeight(prof, psfc, elev, w10, d10, aglTarget) {
+  const pts = [];
+  if (w10 != null && d10 != null) pts.push([10, w10, d10]);
+  for (const l of PROFILE_LEVELS) {
+    const ws = prof[`wind_speed_${l}hPa`], wd = prof[`wind_direction_${l}hPa`], z = prof[`geopotential_height_${l}hPa`];
+    if (ws == null || wd == null || z == null || (psfc != null && l >= psfc)) continue;
+    if (z - elev > 0) pts.push([z - elev, ws, wd]);
+  }
+  pts.sort((a, b) => a[0] - b[0]);
+  const k = pts.findIndex(p => p[0] >= aglTarget);
+  if (k <= 0) return null;
+  const [z0, s0, d0] = pts[k - 1], [z1, s1, d1] = pts[k], f = (aglTarget - z0) / (z1 - z0);
+  const uv = (sp, d) => [-sp * Math.sin(d * Math.PI / 180), -sp * Math.cos(d * Math.PI / 180)];
+  const [u0, v0] = uv(s0, d0), [u1, v1] = uv(s1, d1), u = u0 + (u1 - u0) * f, v = v0 + (v1 - v0) * f;
+  return { speed: Math.hypot(u, v), dir: (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360 };
+}
+const esWater = t => 6.112 * Math.exp(17.62 * t / (243.12 + t));
+const esIce = t => 6.112 * Math.exp(22.46 * t / (272.62 + t));
+// Returns { base: metres AGL | null (no saturation up to 500 hPa), top: highest level checked (m AGL) } or null if no profile
+function diagnoseCloudBase(prof, psfc, elev) {
+  const pts = [];
+  for (const l of PROFILE_LEVELS) {
+    const t = prof[`temperature_${l}hPa`], td = prof[`dew_point_${l}hPa`], z = prof[`geopotential_height_${l}hPa`];
+    if (t == null || td == null || z == null || (psfc != null && l >= psfc)) continue;
+    const agl = z - elev;
+    if (agl >= CB_MIN_AGL) pts.push([agl, esWater(td) / esIce(t)]);
+  }
+  if (pts.length < 2) return null;
+  pts.sort((a, b) => a[0] - b[0]);
+  if (pts[0][1] >= CB_RHI) return { base: pts[0][0], top: pts.at(-1)[0], atLowest: true };
+  for (let k = 1; k < pts.length; k++) {
+    const [z0, r0] = pts[k - 1], [z1, r1] = pts[k];
+    if (r1 >= CB_RHI) return { base: z0 + (CB_RHI - r0) / (r1 - r0) * (z1 - z0), top: pts.at(-1)[0] };
+  }
+  return { base: null, top: pts.at(-1)[0] };
+}
+const PAST_H = 6, NEXT_H = 96;
+// Time windows: the tabs above the chart choose one; it drives the chart, grids and tables below it
+const WINDOWS = [
+  { id: "0", label: "Now–24 h", from: -PAST_H, to: 24, step: 1 },
+  { id: "24", label: "24–48 h", from: 24, to: 48, step: 1 },
+  { id: "48", label: "48–72 h", from: 48, to: 72, step: 1 },
+  { id: "72", label: "72–96 h", from: 72, to: 96, step: 1 },
+  { id: "sum", label: "0–96 h (6-hourly)", from: 0, to: 96, step: 6 },
+];
+// The current window's slice of S.data. In the 6-hourly summary, rows are the values at each 6-hourly
+// time and blocks hold the 6 hours each column covers (grids show the worst hour of the block).
+function view() {
+  const D = S.data, W = WINDOWS.find(w => w.id === S.win);
+  const idx = [];
+  for (let h = W.from; h <= W.to; h += W.step) idx.push(h + PAST_H);
+  return {
+    ...D, win: W,
+    hours: idx.map(i => D.hours[i]),
+    nowIdx: idx.indexOf(D.nowIdx),
+    series: D.series.map(s => ({ ...s, rows: idx.map(i => s.rows[i]),
+      blocks: W.step > 1 ? idx.map(i => s.rows.slice(i, i + W.step)) : null })),
+  };
+}
+// Representative row for a grid cell: the hour itself, or the worst hour of a 6-hourly block
+function cellRow(s, i, score) {
+  if (!s.blocks) return { row: s.rows[i], off: 0 };
+  let best = null;
+  s.blocks[i].forEach((r, k) => { const sc = r ? score(r) : null; if (sc != null && (!best || sc > best.sc)) best = { row: r, off: k, sc }; });
+  return best || { row: null, off: 0 };
+}
+
+// ---------- state ----------
+const S = { locs: [], loc: null, off: 13, win: "0", varId: "wind_speed_10m", hidden: new Set(), data: null };
+const $ = id => document.getElementById(id);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k === "style") n.style.cssText = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return n;
+};
+const svgEl = (tag, attrs = {}) => {
+  const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  return n;
+};
+
+// ---------- time helpers ----------
+const hourKey = d => d.toISOString().slice(0, 13); // "2026-10-20T03"
+// Times are shown in UTC (Z) with local time (L = UTC + S.off hours) alongside.
+const p2 = n => String(n).padStart(2, "0");
+const toL = d => new Date(d.getTime() + S.off * 3600e3); // read with getUTC* to get local fields
+const hhZ = d => `${p2(d.getUTCHours())}Z`;
+const hhL = d => `${p2(toL(d).getUTCHours())}L`;
+const hhmm = d => `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+const fmtBoth = d => `${hhmm(d)}Z [${hhmm(toL(d))}L]`;
+// UTC date + time, with the local date added inside the brackets when it differs from the UTC date
+const fmtDayBoth = d => {
+  const l = toL(d), sameDay = l.getUTCDate() === d.getUTCDate();
+  return `${fmtDay(d)} ${hhmm(d)}Z [${sameDay ? "" : fmtDay(l) + " "}${hhmm(l)}L]`;
+};
+// Wind direction helpers: 3-digit degrees, compass axis labels, and breaking lines across north
+const fmtDir = v => String(Math.round(v / 10) * 10 % 360 || 360).padStart(3, "0");
+const DIR_TICKS = [0, 90, 180, 270, 360];
+const dirTickLabel = tv => `${{ 0: "N", 90: "E", 180: "S", 270: "W", 360: "N" }[tv]} ${String(tv).padStart(3, "0")}`;
+const dirWraps = (a, b) => a != null && b != null && Math.abs(a - b) > 180; // e.g. 350° -> 010°: don't draw across the chart
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const fmtDay = d => `${DOW[d.getUTCDay()]} ${d.getUTCDate()}`;
+const offLabel = o => `UTC${o >= 0 ? "+" : "−"}${Math.abs(o)}`;
+// Local equivalent of a DDHH[MM] group; `ref` anchors month/year (handles month rollover, HH=24)
+function groupDate(dd, hh, mm, ref) {
+  const d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), dd, hh, mm));
+  if (dd < ref.getUTCDate() - 15) d.setUTCMonth(d.getUTCMonth() + 1);
+  else if (dd > ref.getUTCDate() + 15) d.setUTCMonth(d.getUTCMonth() - 1);
+  return d;
+}
+const ddhhL = (d, withMin) => { const l = toL(d); return `${p2(l.getUTCDate())}${p2(l.getUTCHours())}${withMin ? p2(l.getUTCMinutes()) : ""}L`; };
+// Append [local] after every time group in a METAR/TAF
+function annotateReport(raw, ref) {
+  return raw.split(/(\s+)/).map(tok => {
+    let m;
+    if ((m = tok.match(/^(\d{2})(\d{2})\/(\d{2})(\d{2})$/)) && +m[2] <= 24 && +m[4] <= 24 && +m[1] <= 31 && +m[3] <= 31)
+      return `${tok} [${ddhhL(groupDate(+m[1], +m[2], 0, ref))}/${ddhhL(groupDate(+m[3], +m[4], 0, ref))}]`;
+    if ((m = tok.match(/^(\d{2})(\d{2})(\d{2})Z$/))) return `${tok} [${ddhhL(groupDate(+m[1], +m[2], +m[3], ref), true)}]`;
+    if ((m = tok.match(/^FM(\d{2})(\d{2})(\d{2})$/))) return `${tok} [${ddhhL(groupDate(+m[1], +m[2], +m[3], ref), true)}]`;
+    if ((m = tok.match(/^T[XN]M?\d{2}\/(\d{2})(\d{2})Z$/))) return `${tok} [${ddhhL(groupDate(+m[1], +m[2], 0, ref))}]`;
+    return tok;
+  }).join("");
+}
+const ago = t => {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 60) return `${m} min ago`;
+  if (m < 48 * 60) return `${Math.floor(m / 60)} h ${m % 60} min ago`;
+  return `${Math.round(m / 1440)} days ago`;
+};
+
+// ---------- blowing snow ----------
+function blsnRisk(windKt, gustKt, tC) {
+  if (windKt == null || tC == null) return null;
+  if (tC > 0) return 0;
+  const ut = 9.43 + 0.18 * tC + 0.0033 * tC * tC; // m/s
+  const u = windKt / 1.94384, g = gustKt == null ? null : gustKt / 1.94384;
+  if (u >= ut + 5) return 3;
+  if (u >= ut) return 2;
+  if (u >= ut - 2 || (g != null && g >= ut)) return 1;
+  return 0;
+}
+// Ops category thresholds (edit here)
+const OPS = {
+  red:   { visM: 5000, precip: 0.01, cloudFt: 1000, windKt: 40, tempC: -43, lowCloudPct: 90 },
+  green: { visM: 9999, precip: 0.01, cloudFt: 3000, windKt: 20, tempC: -35, lowCloudPct: 50 },
+};
+const catOf = (v, red, green, lowerIsWorse) => lowerIsWorse
+  ? (v < red ? 2 : v < green ? 1 : 0)
+  : (v > red ? 2 : v >= green ? 1 : 0);
+// Each element: evaluate(row) -> null (not available) or { cat, text (tooltip), cell (grid label), sub? }
+const ELEMENTS = [
+  { id: "vis", label: "Visibility", key: () => [`≥ ${OPS.green.visM} m`, `${OPS.red.visM}–${OPS.green.visM - 1} m`, `< ${OPS.red.visM} m`],
+    evaluate: r => {
+      const v = r.visibility; if (v == null) return null;
+      return { cat: catOf(v, OPS.red.visM, OPS.green.visM, true), text: v >= OPS.green.visM ? `≥ ${OPS.green.visM} m` : `${Math.round(v)} m`,
+        cell: v >= OPS.green.visM ? "10+" : (Math.floor(v / 100) / 10).toFixed(1) };
+    } },
+  { id: "precip", label: "Precip", key: () => ["nil", null, `≥ ${OPS.red.precip} mm/h`],
+    evaluate: r => {
+      const p = r.precipitation; if (p == null) return null;
+      return { cat: p >= OPS.red.precip ? 2 : p >= OPS.green.precip ? 1 : 0, text: p < OPS.green.precip ? `nil (${p.toFixed(2)} mm/h)` : `${p.toFixed(2)} mm/h`,
+        cell: p < 0.005 ? "0" : p.toFixed(2).replace(/^0/, "") };
+    } },
+  { id: "cloud", label: "Cloud", key: () => [`≥ ${OPS.green.cloudFt} ft`, `${OPS.red.cloudFt}–${OPS.green.cloudFt - 1} ft`, `< ${OPS.red.cloudFt} ft`],
+    evaluate: r => {
+      if (r.cloud_base !== undefined) { // AMPS model cloud base, metres; null = no cloud
+        if (r.cloud_base == null) return { cat: 0, text: "no cloud", cell: "nil" };
+        const ft = r.cloud_base * 3.281;
+        return { cat: catOf(ft, OPS.red.cloudFt, OPS.green.cloudFt, true), text: `base ${Math.round(ft / 100) * 100} ft`, cell: String(Math.round(ft / 100)).padStart(3, "0") };
+      }
+      const d = r.cloud_diag;
+      if (d) {
+        if (d.base == null) return { cat: 0, text: `no saturated layer below ~${Math.round(d.top * 3.281 / 1000)}k ft (sounding)`, cell: "nil" };
+        const ft = d.base * 3.281, h = Math.round(ft / 100) * 100;
+        return { cat: catOf(ft, OPS.red.cloudFt, OPS.green.cloudFt, true),
+          text: d.atLowest ? `base ≤ ${h} ft (sounding, saturated at lowest level)` : `base ${h} ft (sounding)`,
+          cell: (d.atLowest ? "≤" : "") + String(Math.round(ft / 100)).padStart(3, "0") };
+      }
+      const c = r.cloud_cover_low; if (c == null) return null;
+      return { cat: c >= OPS.red.lowCloudPct ? 2 : c >= OPS.green.lowCloudPct ? 1 : 0, text: `low cloud ${Math.round(c)} % (no base)`, cell: `${Math.round(c)}%` };
+    } },
+  { id: "wind", label: "Wind", key: () => [`< ${OPS.green.windKt} kt, gusts < ${OPS.green.windKt}`, `${OPS.green.windKt}–${OPS.red.windKt} kt, or gusts ${OPS.green.windKt}–${OPS.red.windKt}`, `wind or gusts > ${OPS.red.windKt} kt`],
+    evaluate: r => {
+      const w = r.wind_speed_10m; if (w == null) return null;
+      const d = r.wind_direction_10m == null ? "" : `${String(Math.round(r.wind_direction_10m / 10) * 10 % 360 || 360).padStart(3, "0")}/`;
+      const g = r.wind_gusts_10m;
+      // gusts count too: gusts 20-40 kt make an otherwise light wind yellow; gusts > 40 kt are red
+      const strongest = g != null ? Math.max(w, g) : w;
+      return { cat: catOf(strongest, OPS.red.windKt, OPS.green.windKt, false), text: `${d}${Math.round(w)} kt${g != null ? ` G${Math.round(g)}` : ""}`,
+        cell: String(Math.round(w)), sub: g != null ? `G${Math.round(g)}` : null };
+    } },
+  { id: "temp", label: "Temp", key: () => [`≥ ${OPS.green.tempC} °C`, `${OPS.red.tempC} to < ${OPS.green.tempC} °C`, `< ${OPS.red.tempC} °C`],
+    evaluate: r => {
+      const t = r.temperature_2m; if (t == null) return null;
+      return { cat: catOf(t, OPS.red.tempC, OPS.green.tempC, true), text: `${t.toFixed(1)} °C`, cell: String(Math.round(t)) };
+    } },
+];
+// Overall category = worst element; null if the model has no data at that hour
+function opsCategory(r) {
+  if (!r) return null;
+  const els = ELEMENTS.map(e => ({ e, v: e.evaluate(r) }));
+  const have = els.filter(x => x.v);
+  if (!have.length) return null;
+  const cat = Math.max(...have.map(x => x.v.cat));
+  return { cat, els, why: have.filter(x => x.v.cat === cat && cat > 0).map(x => `${x.e.label} ${x.v.text}`),
+    missing: els.filter(x => !x.v).map(x => x.e.label.toLowerCase()) };
+}
+const OPSCAT = [
+  { cls: "g", icon: "✓", label: "Green" },
+  { cls: "r1", icon: "!", label: "Yellow" },
+  { cls: "r3", icon: "✕", label: "Red" },
+];
+
+const RISK = [
+  { cls: "r0", icon: "·", label: "None" },
+  { cls: "r1", icon: "!", label: "Possible" },
+  { cls: "r2", icon: "▲", label: "Likely" },
+  { cls: "r3", icon: "■", label: "Heavy" },
+];
+
+// ---------- data loading ----------
+// In the iPhone/iPad app (window.AFC_NATIVE) remote requests go through the app, which fetches them natively
+// and keeps a saved copy for offline use; it marks saved copies with X-AFC-Cached.
+// ctx (one per load pass): { savedOnly } asks the app for saved copies only, without the network, so the
+// last data shows instantly; the app reports which answers were saved copies in ctx.saved / ctx.bundled.
+async function xfetch(url, opts = {}, ctx = {}) {
+  const remote = /^https?:/.test(url);
+  if (window.AFC_NATIVE && ctx.savedOnly) opts = { ...opts, headers: { ...(opts.headers || {}), "X-AFC-Saved-Only": "1" } };
+  const r = await fetch(window.AFC_NATIVE && remote ? `/proxy?u=${encodeURIComponent(url)}` : url, opts);
+  const saved = r.headers.get("X-AFC-Cached");
+  if (saved && saved !== "bundled") ctx.saved = !ctx.saved || saved < ctx.saved ? saved : ctx.saved;
+  if (saved === "bundled") ctx.bundled = true;
+  return r;
+}
+async function loadLocations() {
+  S.locs = await (await fetch("locations.json")).json();
+  const sel = $("loc");
+  for (const l of S.locs) sel.append(el("option", { value: l.id }, l.name));
+  sel.append(el("option", { value: "custom" }, "Custom lat / lon…"));
+  let saved = null;
+  try { saved = localStorage.getItem("afc.loc"); } catch {}
+  sel.value = S.locs.some(l => l.id === saved) ? saved : S.locs[0].id;
+  S.loc = S.locs.find(l => l.id === sel.value);
+}
+
+async function fetchOpenMeteo(lat, lon, ctx) {
+  const ids = MODELS.filter(m => !m.src).map(m => m.id);
+  const fetchIds = [...new Set([...ids, ...Object.values(PROFILE_FROM)])];
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&hourly=${[...OM_HOURLY, "surface_pressure", ...PROFILE_VARS, ...WIND_LEVEL_VARS].join(",")}&models=${fetchIds.join(",")}&past_hours=${PAST_H + 1}&forecast_hours=${NEXT_H + 1}` +
+    `&wind_speed_unit=kn&timezone=GMT`;
+  const r = await xfetch(url, {}, ctx);
+  if (!r.ok) throw new Error(`Open-Meteo ${r.status}`);
+  const j = await r.json();
+  const out = {};
+  for (const id of ids) {
+    const rows = {};
+    j.hourly.time.forEach((t, i) => {
+      const row = {};
+      for (const v of OM_HOURLY) { const a = j.hourly[`${v}_${id}`]; row[v] = a ? a[i] : null; }
+      const pid = PROFILE_FROM[id] || id, val = v => j.hourly[`${v}_${pid}`]?.[i] ?? null;
+      const prof = Object.fromEntries(PROFILE_VARS.map(v => [v, val(v)]));
+      row.cloud_diag = diagnoseCloudBase(prof, val("surface_pressure"), j.elevation);
+      for (const v of WIND_LEVEL_VARS) prof[v] = val(v);
+      const w2k = windAtHeight(prof, val("surface_pressure"), j.elevation, row.wind_speed_10m, row.wind_direction_10m, AGL_2000FT);
+      row.wind_speed_2000ft = w2k?.speed ?? null;
+      row.wind_direction_2000ft = w2k?.dir ?? null;
+      row.cloud_diag_src = pid;
+      rows[t.slice(0, 13)] = row;
+    });
+    out[id] = { rows, grid: `${j.latitude.toFixed(2)}, ${j.longitude.toFixed(2)}` };
+  }
+  return out;
+}
+
+async function fetchRuns(ctx) {
+  const out = {};
+  await Promise.all(MODELS.filter(m => m.meta).map(async m => {
+    try {
+      const j = await (await xfetch(`https://api.open-meteo.com/data/${m.meta}/static/meta.json`, {}, ctx)).json();
+      out[m.id] = new Date(j.last_run_initialisation_time * 1000);
+    } catch {}
+  }));
+  return out;
+}
+
+async function fetchAmps(loc, ctx) {
+  try {
+    const j = await (await xfetch("data/amps.json", { cache: "no-cache" }, ctx)).json();
+    const L = loc && j.locations[loc.id];
+    if (!L) return { run: new Date(j.run), missing: loc ? "outside AMPS domains" : "pre-set locations only" };
+    const rows = {};
+    const toRow = h => ({ ...h, wind_gusts_10m: null, cloud_cover: null, cloud_cover_low: null, visibility: h.visibility_snow ?? null });
+    L.hourly.forEach((h, k) => {
+      rows[h.time.slice(0, 13)] = toRow(h);
+      // 3-hourly domains: fill the hours between outputs (linear for values, nearest for direction/cloud base)
+      const nx = L.hourly[k + 1];
+      if (!nx || nx.fh - h.fh <= 1) return;
+      for (let dh = 1; dh < nx.fh - h.fh; dh++) {
+        const f = dh / (nx.fh - h.fh), near = f < 0.5 ? h : nx, row = { ...toRow(near), fh: h.fh + dh, interpolated: true };
+        for (const k2 of ["wind_speed_10m", "wind_speed_2000ft", "temperature_2m", "relative_humidity_2m", "pressure_msl", "precipitation", "visibility_snow"])
+          if (h[k2] != null && nx[k2] != null) row[k2] = h[k2] + (nx[k2] - h[k2]) * f;
+        row.visibility = row.visibility_snow ?? null;
+        const t = new Date(new Date(h.time + "Z").getTime() + dh * 3600e3);
+        rows[t.toISOString().slice(0, 13)] = row;
+      }
+    });
+    return { run: new Date(j.run), rows, domain: L.domain, grid_km: L.grid_km, step: L.step_h, extended: L.extended };
+  } catch { return { missing: "no AMPS export found" }; }
+}
+
+// A site's METAR/TAF stations, in preference order (its own station first, then fallbacks)
+const stationList = v => [].concat(v || []);
+
+async function fetchObs(loc, ctx) {
+  if (!loc || (!stationList(loc.metar).length && !stationList(loc.taf).length)) return null;
+  try {
+    const r = await xfetch(`/api/obs?metar=${stationList(loc.metar).join(",")}&taf=${stationList(loc.taf).join(",")}`, {}, ctx);
+    if (!r.ok) throw new Error(`obs ${r.status}`);
+    return await r.json();
+  } catch (e) { return { error: e.message }; }
+}
+
+let loadSeq = 0;
+async function gather(loc, savedOnly) {
+  const ctx = { savedOnly };
+  const [om, runs, amps, obs, hist] = await Promise.all([
+    fetchOpenMeteo(loc.lat, loc.lon, ctx), fetchRuns(ctx), fetchAmps(loc.custom ? null : loc, ctx), fetchObs(loc, ctx), fetchAmpsHistory(ctx),
+  ]);
+  return { om, runs, amps, obs, hist, net: { saved: ctx.saved, bundled: ctx.bundled, savedOnly } };
+}
+
+function build(loc, g) {
+  const { om, runs, amps, obs } = g;
+  const now = new Date(); now.setUTCMinutes(0, 0, 0);
+  const hours = [];
+  for (let h = -PAST_H; h <= NEXT_H; h++) hours.push(new Date(now.getTime() + h * 3600e3));
+  const series = MODELS.map(m => {
+    const src = m.src === "amps" ? amps : om[m.id];
+    return {
+      ...m, run: m.src === "amps" ? amps.run : runs[m.id], missing: src?.missing,
+      label: m.src === "amps" && amps.grid_km
+        ? `AMPS ${+amps.grid_km.toPrecision(2)}${amps.extended ? `→${+amps.extended.grid_km.toPrecision(2)}` : ""} km` : m.label,
+      extra: m.src === "amps" && amps.domain ? `${amps.domain}, ${amps.grid_km} km grid` +
+        (amps.extended ? `, then ${amps.extended.domain} ${amps.extended.grid_km} km (3-hourly) from +${amps.extended.from_fh} h` : "") : null,
+      rows: hours.map(t => src?.rows?.[hourKey(t)] ?? null),
+    };
+  });
+  S.hist = g.hist;
+  S.net = g.net;
+  S.data = { loc, now, hours, nowIdx: PAST_H, series, obs, loaded: g.net.saved ? new Date(g.net.saved) : new Date() };
+  render();
+}
+
+async function load() {
+  const loc = S.loc, seq = ++loadSeq; // a newer load (site switched) supersedes this one
+  $("main").classList.add("loading");
+  $("meta").textContent = `Loading ${loc.name}…`;
+  // In the app, show the last saved data straight away (no network), then refresh it
+  if (window.AFC_NATIVE) {
+    try {
+      const g = await gather(loc, true);
+      if (seq !== loadSeq) return;
+      build(loc, g);
+      $("main").classList.remove("loading");
+    } catch { /* nothing saved for this site yet */ }
+  }
+  try {
+    const g = await gather(loc, false);
+    if (seq !== loadSeq) return;
+    build(loc, g);
+  } catch (e) {
+    if (seq !== loadSeq) return;
+    if (S.data && S.data.loc === loc) $("meta").append(" ", el("span", { class: "age-badge old" }, `Couldn't update: ${e.message}`));
+    else $("meta").replaceChildren(el("span", { class: "err" }, `Failed to load: ${e.message}`));
+  } finally { if (seq === loadSeq) $("main").classList.remove("loading"); }
+}
+
+// ---------- rendering ----------
+function render() {
+  const D = S.data; if (!D) return;
+  const l = D.loc;
+  // site name and offset are already in the header dropdowns; keep only position and data age here
+  $("meta").textContent = `${l.custom ? "Custom point · " : ""}${Math.abs(l.lat).toFixed(3)}°${l.lat < 0 ? "S" : "N"} ${Math.abs(l.lon).toFixed(3)}°${l.lon < 0 ? "W" : "E"}` +
+    ` · data fetched ${fmtBoth(D.loaded)}`;
+  const net = S.net || {};
+  if (net.savedOnly) $("meta").append(" ", el("span", { class: "age-badge stale" }, "Saved data · updating…"));
+  else if (net.saved) $("meta").append(" ", el("span", { class: "age-badge old" }, `Offline · showing data saved ${fmtDayBoth(new Date(net.saved))}`));
+  if (net.bundled) $("meta").append(" ", el("span", { class: "age-badge stale" }, "AMPS from the copy built into the app"));
+  $("nowTime").textContent = `${fmtDayBoth(D.now)}`;
+  renderObs(); renderNowTable(); renderWindowTabs(); renderVarButtons(); renderWindowed(); renderTrend();
+}
+
+// Observation freshness: METARs are hourly where a station is staffed, but many report intermittently
+const FRESH_MIN = 90, CURRENT_MIN = 180;
+const ageMin = r => (Date.now() - r.obsTime * 1000) / 60000;
+// Use the first station in the site's list that has reported within CURRENT_MIN; otherwise the freshest report
+function obsStation() {
+  const latest = S.data.obs?.latest || {}, list = stationList(S.data.loc.metar);
+  const cur = list.find(c => latest[c] && ageMin(latest[c]) <= CURRENT_MIN);
+  if (cur) return cur;
+  const any = list.filter(c => latest[c]).sort((a, b) => latest[b].obsTime - latest[a].obsTime);
+  return any[0] || null;
+}
+function metarObs() {
+  const m = S.data.obs?.metar, st = obsStation();
+  return Array.isArray(m) ? m.filter(r => r.icaoId === st).sort((a, b) => a.obsTime - b.obsTime) : [];
+}
+function obsValue(o, varId) {
+  switch (varId) {
+    case "wind_speed_10m": return o.wspd ?? null;
+    case "wind_direction_10m": return typeof o.wdir === "number" ? o.wdir : null; // "VRB" left out
+    case "wind_gusts_10m": return o.wgst ?? null;
+    case "temperature_2m": return o.temp ?? null;
+    case "pressure_msl": return o.slp ?? o.altim ?? null;
+    case "cloud_base": { // METAR ceiling: lowest BKN/OVC layer or vertical visibility
+      const c = (o.clouds || []).filter(c => ["BKN", "OVC", "OVX", "VV"].includes(c.cover) && c.base != null).map(c => c.base);
+      return c.length ? Math.min(...c, 10000) : null;
+    }
+    case "visibility": {
+      if (o.visib == null) return null;
+      if (typeof o.visib === "string" && o.visib.endsWith("+")) return 10; // "6+" SM = 9999
+      const v = parseFloat(o.visib); // statute miles
+      return Math.min(v * 1.609, 10);
+    }
+    default: return null;
+  }
+}
+
+// METAR station differs from the selected site (e.g. NZCM standing in for NZFX)
+const offsite = () => { const st = obsStation(); return !!st && st !== S.data.loc.id; };
+const offsiteBadge = () => el("span", { class: "offsite-badge", title: `Observations are from ${obsStation()}, not ${S.data.loc.name}` }, `⚠ ${obsStation()}, not on site`);
+
+function ageBadge(mins) {
+  if (mins <= FRESH_MIN) return null;
+  const txt = mins <= CURRENT_MIN ? "Stale" : "Not current";
+  return el("span", { class: `age-badge ${mins <= CURRENT_MIN ? "stale" : "old"}` }, txt);
+}
+
+function renderObs() {
+  const D = S.data, box = $("obs"), tafBox = $("taf");
+  const metars = stationList(D.loc.metar), tafs = stationList(D.loc.taf);
+  if (!D.obs) {
+    box.replaceChildren(el("div", { class: "note" }, "No reporting station configured for this location."));
+    tafBox.replaceChildren(el("div", { class: "status" }, "No TAF station configured for this location."));
+    return;
+  }
+  if (D.obs.error) {
+    box.replaceChildren(el("div", { class: "err" }, `Observations unavailable (${D.obs.error}). Is serve.py running?`));
+    tafBox.replaceChildren(); return;
+  }
+  // ---- METAR
+  const latest = D.obs.latest || {}, st = obsStation(), last = st && latest[st];
+  const others = metars.filter(c => c !== st).map(c => latest[c]
+    ? `${c} last reported ${fmtDay(new Date(latest[c].obsTime * 1000))} ${hhmm(new Date(latest[c].obsTime * 1000))}Z (${ago(latest[c].obsTime * 1000)})`
+    : `${c}: no report in the last 7 days`);
+  if (!last) {
+    box.replaceChildren(el("div", { class: "note" }, `No METAR from ${metars.join(" or ") || "—"} in the last 7 days. Reports here are intermittent.`));
+  } else {
+    const t = new Date(last.obsTime * 1000), mins = ageMin(last);
+    const vis = obsValue(last, "visibility");
+    const cl = (last.clouds || []).map(c => `${c.cover}${c.base != null ? String(Math.round(c.base / 100)).padStart(3, "0") : ""}`).join(" ") || "—";
+    const stat = (v, l) => el("div", { class: "stat" }, el("div", { class: "v" }, v), el("div", { class: "l" }, l));
+    box.replaceChildren(
+      el("div", { class: `obs-head ${mins > CURRENT_MIN ? "dim" : ""}` },
+        stat(`${last.wdir ?? "—"}/${last.wspd ?? "—"}${last.wgst ? "G" + last.wgst : ""}`, "Wind kt"),
+        stat(last.temp != null ? `${last.temp}°` : "—", "Temp °C"),
+        stat(vis == null ? "—" : vis >= 10 ? "10+" : vis.toFixed(1), "Vis km"),
+        stat(cl, "Cloud"),
+        last.wxString ? stat(last.wxString, "Weather") : null),
+      el("div", { class: "note" },
+        el("span", { class: offsite() ? "offsite" : "" }, last.icaoId),
+        ` · ${fmtBoth(t)} (${ago(t)})`, ageBadge(mins),
+        offsite() ? el("span", { class: "offsite" }, ` · nearest reporting station, not ${D.loc.name}`) : null),
+      el("div", { class: "raw" }, annotateReport(last.rawOb, t)),
+      ...(others.length ? [el("div", { class: "note" }, others.join(" · "))] : []));
+  }
+  // ---- TAF
+  const taf = tafs.map(c => (D.obs.taf || []).find(x => x.icaoId === c)).find(Boolean);
+  if (!taf) {
+    tafBox.replaceChildren(el("div", { class: "status" },
+      tafs.length ? `No current TAF for ${tafs.join(" or ")}. TAFs here are issued intermittently.` : "No TAF station configured for this location."));
+    return;
+  }
+  const now = Date.now() / 1000, from = new Date(taf.validTimeFrom * 1000), to = new Date(taf.validTimeTo * 1000);
+  const state = now > taf.validTimeTo ? ["old", `Expired ${ago(to)}`] : now < taf.validTimeFrom ? ["stale", `Not valid until ${fmtDayBoth(from)}`] : [null, `Current · valid to ${fmtDayBoth(to)}`];
+  tafBox.replaceChildren(
+    el("div", { class: "status" }, `${taf.icaoId} · issued ${fmtDayBoth(new Date(taf.issueTime))} · `,
+      state[0] ? el("span", { class: `age-badge ${state[0]}` }, state[1]) : state[1]),
+    annotateReport(taf.rawTAF.trim(), new Date(taf.issueTime)).replace(/\s+(BECMG|TEMPO|FM\d{6}|PROB\d{2})/g, "\n  $1"));
+}
+
+const median = a => { const s = a.filter(v => v != null).sort((x, y) => x - y); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const valueOf = (row, v) => {
+  if (row == null) return null;
+  const x = v.get ? v.get(row) : row[v.id];
+  return x == null ? null : x * (v.scale || 1);
+};
+
+function showModelInfo(s) {
+  const info = MODEL_INFO[s.id], dlg = $("modelInfo");
+  if (!info) return;
+  const list = items => el("ul", {}, items.map(t => el("li", {}, t)));
+  const sec = (h, body) => el("section", {}, el("h4", {}, h), body);
+  dlg.querySelector(".mi-body").replaceChildren(
+    el("h3", {}, el("span", { class: "key", style: `border-color:${s.color}` }), info.name),
+    el("p", { class: "mi-who" }, info.who),
+    el("p", {}, info.what),
+    sec("Strengths", list(info.good)),
+    sec("Limitations", list(info.limits)),
+    sec("In this tool", list([
+      ...info.here,
+      s.missing ? `Not available for this site: ${s.missing}.` : s.run ? `Run shown: ${s.run.getUTCDate()} ${hhmm(s.run)}Z${s.extra ? ` · ${s.extra}` : ""}.` : null,
+    ].filter(Boolean))));
+  dlg.showModal();
+}
+
+function modelCell(s) {
+  return el("td", {}, el("span", { class: "key", style: `border-color:${s.color}` }),
+    el("button", { class: "model-name", title: `About ${s.label}`, onclick: () => showModelInfo(s) }, s.label),
+    el("span", { class: "run" }, s.missing ? s.missing : s.run ? `${String(s.run.getUTCHours()).padStart(2, "0")}Z ${s.run.getUTCDate()}` : ""));
+}
+
+function renderNowTable() {
+  const D = S.data, i = D.nowIdx;
+  const cols = [
+    { h: "Wind", get: r => r?.wind_speed_10m, fmt: (v, r) => `${r.wind_direction_10m == null ? "—" : String(Math.round(r.wind_direction_10m / 10) * 10).padStart(3, "0")}/${Math.round(v)}`, far: 10 },
+    { h: "Gust", get: r => r?.wind_gusts_10m, fmt: v => Math.round(v), far: 10 },
+    { h: "Temp °C", get: r => r?.temperature_2m, fmt: v => v.toFixed(1), far: 4 },
+    { h: "Low cld %", get: r => r?.cloud_cover_low, fmt: v => Math.round(v), far: 40 },
+    { h: "Total cld %", get: r => r?.cloud_cover, fmt: v => Math.round(v), far: 40 },
+    { h: "Cld base ft", get: r => r?.cloud_base ?? r?.cloud_diag?.base, fmt: v => Math.round(v * 3.281 / 100) * 100 },
+    { h: "Vis km", get: r => r?.visibility == null ? null : r.visibility / 1000, fmt: v => v >= 10 ? "10+" : v.toFixed(1) },
+    { h: "Precip mm/h", get: r => r?.precipitation, fmt: v => v.toFixed(2) },
+    { h: "MSLP", get: r => r?.pressure_msl, fmt: v => v.toFixed(0) },
+  ];
+  const rows = D.series.map(s => s.rows[i]);
+  const meds = cols.map(c => median(rows.map(c.get)));
+  const thead = el("tr", {}, el("th", {}, "Model"), cols.map(c => el("th", {}, c.h)), el("th", {}, "BLSN"));
+  const body = D.series.map((s, k) => {
+    const r = rows[k];
+    const risk = r ? blsnRisk(r.wind_speed_10m, r.wind_gusts_10m, r.temperature_2m) : null;
+    return el("tr", {}, modelCell(s),
+      cols.map((c, j) => {
+        const v = c.get(r);
+        if (v == null) return el("td", { class: "na" }, "—");
+        const far = c.far && meds[j] != null && Math.abs(v - meds[j]) > c.far;
+        return el("td", { class: far ? "far" : "", title: far ? `${Math.abs(v - meds[j]).toFixed(1)} from median` : "" }, String(c.fmt(v, r)));
+      }),
+      el("td", {}, risk == null ? "—" : el("span", { class: `risk ${RISK[risk].cls}` }, el("i", {}, RISK[risk].icon), RISK[risk].label)));
+  });
+  const spread = el("tr", { class: "summary" }, el("td", {}, "Median (range)"), cols.map((c, j) => {
+    const vals = rows.map(c.get).filter(v => v != null);
+    if (!vals.length) return el("td", {}, "—");
+    const lo = Math.min(...vals), hi = Math.max(...vals), f = v => String(c.fmt(v, { wind_direction_10m: null })).replace(/^—\//, "");
+    return el("td", {}, lo === hi ? f(lo) : `${f(meds[j])} (${f(lo)} to ${f(hi)})`);
+  }), el("td", {}, ""));
+  $("nowTable").replaceChildren(el("thead", {}, thead), el("tbody", {}, body, spread));
+}
+
+// ---------- run-to-run trend ----------
+// Which past runs of a model forecast the next TREND_H hours, one line per run. AMPS only for now; the
+// global models need their single-run archive (harvest.py) before they can be added.
+const TREND_H = 12;
+const TREND_MODELS = [{ id: "amps", label: "AMPS", ready: true }, ...MODELS.filter(m => !m.src).map(m => ({ id: m.id, label: m.label, ready: false }))];
+const TREND_VARS = [
+  { id: "ws", label: "Wind", unit: "kt", fmt: v => v.toFixed(0), floor: 0, step: 5 },
+  { id: "wd", label: "Wind dir", unit: "°", fmt: v => fmtDir(v), dir: true, nearest: true },
+  { id: "t", label: "Temp", unit: "°C", fmt: v => v.toFixed(1) },
+  { id: "cb", label: "Cloud base", unit: "ft", fmt: v => v >= 10000 ? "10k+" : String(Math.round(v / 100) * 100), floor: 0, ceil: 10000, conv: m => m * 3.281, nearest: true },
+  { id: "vis", label: "Visibility", unit: "km", fmt: v => v >= 10 ? "10+" : v.toFixed(1), floor: 0, ceil: 10, conv: m => m / 1000 },
+  { id: "p", label: "Precip", unit: "mm/h", fmt: v => v.toFixed(2), floor: 0 },
+  { id: "mslp", label: "MSLP", unit: "hPa", fmt: v => v.toFixed(0) },
+];
+// Sequential blue ramp, oldest (light) to newest (dark)
+const TREND_RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#1c5cab", "#104281", "#0d366b"];
+S.trendModel = "amps"; S.trendVar = "ws";
+
+async function fetchAmpsHistory(ctx) {
+  try { return await (await xfetch("data/amps_history.json", { cache: "no-cache" }, ctx)).json(); } catch { return null; }
+}
+
+// A run's value at each target hour: exact where the run has output, otherwise interpolated (3-hourly grid)
+function trendSeries(col, hours, TV) {
+  const t = col.time.map(s => new Date(s + "Z").getTime());
+  const val = k => { const x = col[TV.id][k]; return x == null ? null : TV.conv ? TV.conv(x) : x; };
+  return hours.map(h => {
+    const ms = h.getTime(), k = t.indexOf(ms);
+    if (k >= 0) return { v: val(k), dom: col.dom[k], wd: col.wd[k], ws: col.ws[k], interp: false };
+    const j = t.findIndex(x => x > ms);
+    if (j <= 0) return null;
+    const a = val(j - 1), b = val(j), f = (ms - t[j - 1]) / (t[j] - t[j - 1]);
+    const v = TV.nearest || a == null || b == null ? (f < 0.5 ? a : b) : a + (b - a) * f;
+    const n = f < 0.5 ? j - 1 : j;
+    return { v, dom: col.dom[n], wd: col.wd[n], ws: col.ws[n], interp: true };
+  });
+}
+
+function renderTrend() {
+  const D = S.data, H = S.hist;
+  $("trendModel").replaceChildren(...TREND_MODELS.map(m => el("option", { value: m.id, ...(m.ready ? {} : { disabled: "" }) }, m.ready ? m.label : `${m.label} (coming)`)));
+  $("trendModel").value = S.trendModel;
+  $("trendVars").replaceChildren(...TREND_VARS.map(v => el("button", {
+    "aria-pressed": String(v.id === S.trendVar), onclick: () => { S.trendVar = v.id; renderTrend(); } }, v.label)));
+  const TV = TREND_VARS.find(v => v.id === S.trendVar);
+  const hours = []; for (let h = 0; h <= TREND_H; h++) hours.push(new Date(D.now.getTime() + h * 3600e3));
+  const site = H?.sites?.[D.loc.id];
+  if (!site) {
+    $("trendChart").replaceChildren(el("div", { class: "note" }, D.loc.custom ? "Run history is kept for the pre-set sites only." : "No AMPS run history for this site yet."));
+    for (const id of ["trendLegend", "trendNote", "trendTable", "runGridTitle", "runGridNote", "runGrid", "runGridKey"]) $(id).replaceChildren();
+    return;
+  }
+  // newest run first; only runs whose forecast reaches the window
+  const runs = Object.keys(site).sort().reverse()
+    .map(r => ({ run: new Date(r), pts: trendSeries(site[r], hours, TV) }))
+    .filter(x => x.pts.some(p => p && p.v != null));
+  runs.forEach((x, k) => {
+    // spread runs across the ramp: newest darkest, oldest at step 2 (lighter steps are too faint as lines)
+    const top = TREND_RAMP.length - 1, f = runs.length > 1 ? k / (runs.length - 1) : 0;
+    x.color = TREND_RAMP[Math.round(top - f * (top - 2))];
+    x.label = `${p2(x.run.getUTCHours())}Z ${fmtDay(x.run)}`;
+    const doms = [...new Set(x.pts.filter(Boolean).map(p => p.dom))];
+    const km = { d5: "0.85", d6: "2.6", d3: "2.6", d2: "7.7", d1: "23" };
+    x.grid = doms.map(d => `${km[d] || d} km`).join("→");
+    x.lead = Math.round((hours[0] - x.run) / 3600e3);
+  });
+
+  // ---- chart
+  const box = $("trendChart"), W = Math.max(320, box.clientWidth || 800), Hh = W < 600 ? 220 : 280;
+  const m = { l: 54, r: 14, t: 12, b: 50 }, iw = W - m.l - m.r, ih = Hh - m.t - m.b;
+  let vals = runs.flatMap(x => x.pts.map(p => p?.v)).filter(v => v != null);
+  if (TV.ceil != null) vals = vals.map(v => Math.min(v, TV.ceil));
+  let lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
+  if (TV.floor != null) lo = Math.min(lo, TV.floor);
+  if (hi - lo < 1) { hi += 0.5; lo -= 0.5; }
+  const ticks = TV.dir ? DIR_TICKS : TV.step ? fixedTicks(lo, hi, TV.step) : niceTicks(lo, hi, 5); lo = ticks[0]; hi = ticks.at(-1);
+  const t0 = hours[0].getTime(), t1 = hours.at(-1).getTime();
+  const x = t => m.l + (t - t0) / (t1 - t0) * iw, y = v => m.t + ih - (Math.min(v, hi) - lo) / (hi - lo) * ih;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${Hh}`, role: "img", "aria-label": `${TV.label} for the next ${TREND_H} hours from successive AMPS runs` });
+  const yl = svgEl("text", { "text-anchor": "middle", transform: `translate(12 ${m.t + ih / 2}) rotate(-90)`, style: "fill:var(--ink-2);font-size:12px" });
+  yl.textContent = `${TV.label} (${TV.unit})`; svg.append(yl);
+  for (const tv of ticks) {
+    svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(tv), y2: y(tv), stroke: "var(--grid)", "stroke-width": 1 }));
+    const tx = svgEl("text", { x: m.l - 6, y: y(tv) + 4, "text-anchor": "end" }); tx.textContent = TV.dir ? dirTickLabel(tv) : Number.isInteger(tv) ? String(tv) : TV.fmt(tv); svg.append(tx);
+  }
+  hours.forEach((t, i) => {
+    if (i % (W < 600 ? 3 : 2)) return;
+    const a = svgEl("text", { x: x(t.getTime()), y: Hh - m.b + 16, "text-anchor": "middle", style: "fill:var(--ink-2)" }); a.textContent = hhZ(t); svg.append(a);
+    const b = svgEl("text", { x: x(t.getTime()), y: Hh - m.b + 29, "text-anchor": "middle" }); b.textContent = hhL(t); svg.append(b);
+  });
+  const dl = svgEl("text", { x: m.l, y: Hh - m.b + 44, style: "fill:var(--ink-2);font-weight:600" }); dl.textContent = fmtDay(hours[0]); svg.append(dl);
+  for (let t = Date.UTC(hours[0].getUTCFullYear(), hours[0].getUTCMonth(), hours[0].getUTCDate() + 1); t <= t1; t += 86400e3) {
+    svg.append(svgEl("line", { x1: x(t), x2: x(t), y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-dasharray": "2 4" }));
+    const d = svgEl("text", { x: x(t) + 3, y: Hh - m.b + 44, style: "fill:var(--ink-2);font-weight:600" }); d.textContent = fmtDay(new Date(t)); svg.append(d);
+  }
+  svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, stroke: "var(--axis)" }));
+  // oldest first so the newest run draws on top
+  for (const r of [...runs].reverse()) {
+    let d = "", pen = false, lastV = null;
+    r.pts.forEach((p, i) => {
+      if (!p || p.v == null) { pen = false; return; }
+      const join = pen && !(TV.dir && dirWraps(lastV, p.v));
+      d += `${join ? "L" : "M"}${x(hours[i].getTime()).toFixed(1)},${y(p.v).toFixed(1)}`; pen = true; lastV = p.v;
+    });
+    if (d) svg.append(svgEl("path", { d, fill: "none", stroke: r.color, "stroke-width": r === runs[0] ? 3 : 2, "stroke-linejoin": "round" }));
+  }
+  // hover readout: every run's value at that hour
+  const cross = svgEl("line", { y1: m.t, y2: m.t + ih, stroke: "var(--ink-2)", visibility: "hidden" }); svg.append(cross);
+  const hit = svgEl("rect", { x: m.l, y: 0, width: iw, height: Hh, fill: "transparent" }); svg.append(hit);
+  const tip = el("div", { class: "tip" });
+  const show = evt => {
+    const rc = svg.getBoundingClientRect(), px = (evt.clientX - rc.left) / rc.width * W;
+    const i = Math.max(0, Math.min(TREND_H, Math.round((px - m.l) / iw * TREND_H))), cx = x(hours[i].getTime());
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    tip.replaceChildren(el("div", { class: "t" }, `Valid ${fmtDayBoth(hours[i])} · ${TV.label} ${TV.unit}`),
+      ...runs.map(r => { const p = r.pts[i]; return el("div", { class: "row" }, el("span", { class: "key", style: `border-color:${r.color};margin-right:0` }),
+        el("b", {}, p?.v == null ? "—" : TV.fmt(p.v)), el("span", {}, `${r.label} (+${r.lead + i} h)`)); }));
+    tip.style.display = "block";
+    const bw = box.clientWidth, pxl = cx / W * bw;
+    tip.style.left = `${pxl + 200 > bw ? Math.max(0, pxl - 200) : pxl + 12}px`; tip.style.top = "8px";
+  };
+  hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show);
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; cross.setAttribute("visibility", "hidden"); });
+  box.replaceChildren(svg, tip);
+
+  $("trendLegend").replaceChildren(...runs.map((r, k) => el("span", { style: "display:inline-flex;align-items:center;color:var(--ink-2)" },
+    el("span", { class: "key", style: `border-color:${r.color};border-top-width:${k === 0 ? 3 : 2}px` }),
+    `${r.label}${k === 0 ? " (latest)" : ""} · +${r.lead}–${r.lead + TREND_H} h · ${r.grid}`)));
+  $("trendNote").textContent = `Each line is one AMPS run's forecast for the same ${TREND_H} hours; lines converging means the runs agree. ` +
+    "Older runs reach this window at longer lead times, often on the coarser 7.7 km grid (labelled). Italic table values are interpolated between 3-hourly outputs. " +
+    "Δ is the latest run minus the previous run, averaged over the window.";
+
+  // ---- table: runs (newest first) x valid hours, plus change from the previous run
+  const tD = { hours, nowIdx: 0 };
+  const head = hourHeads(tD, "Valid UTC", `Local (${offLabel(S.off)})`, i => i === 0 ? "nowcol" : "");
+  head[0].append(el("th", { rowspan: 3 }, "Δ"));
+  const body = runs.map((r, k) => {
+    const prev = runs[k + 1];
+    const diff = (a, b) => TV.dir ? ((a - b + 540) % 360) - 180 : a - b; // direction: shortest turn, + = veered (clockwise)
+    const diffs = prev ? r.pts.map((p, i) => p?.v != null && prev.pts[i]?.v != null ? diff(p.v, prev.pts[i].v) : null).filter(v => v != null) : [];
+    const delta = diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : null;
+    return el("tr", {},
+      el("td", {}, el("span", { class: "key", style: `border-color:${r.color}` }), `${r.label}`, el("span", { class: "run" }, `+${r.lead} h · ${r.grid}`)),
+      r.pts.map(p => el("td", { class: p?.interp ? "interp" : "" }, p?.v == null ? "—" : TV.fmt(p.v))),
+      el("td", { class: delta == null || Math.abs(delta) < 0.05 ? "" : delta > 0 ? "delta-up" : "delta-down" },
+        delta == null ? "" : `${delta > 0 ? "+" : ""}${TV.id === "cb" ? Math.round(delta / 100) * 100 : TV.dir ? Math.round(delta) + "°" : delta.toFixed(TV.id === "p" ? 2 : 1)}`));
+  });
+  $("trendTable").replaceChildren(el("thead", {}, head), el("tbody", {}, body));
+  renderRunGrid(site, TV);
+}
+
+// Run x valid-time grid: next RG_H hours at 3-hourly times, one row per run (oldest at top), cells shaded by value
+const RG_H = 48, RG_STEP = 3;
+// darker = worse for flying: more wind/precip, lower cloud/visibility, colder
+const RG_SCALE = { ws: { lo: 0, hi: 30 }, p: { lo: 0, hi: 0.5 }, cb: { lo: 0, hi: 5000, invert: true }, vis: { lo: 0, hi: 10, invert: true }, t: { invert: true }, mslp: {} };
+function renderRunGrid(site, TV) {
+  const D = S.data;
+  const start = new Date(D.now); start.setUTCHours(Math.floor(start.getUTCHours() / RG_STEP) * RG_STEP);
+  const hours = []; for (let h = 0; h <= RG_H; h += RG_STEP) hours.push(new Date(start.getTime() + h * 3600e3));
+  const runs = Object.keys(site).sort().map(r => ({ run: new Date(r), pts: trendSeries(site[r], hours, TV) }))
+    .filter(x => x.pts.some(p => p && p.v != null));
+  const all = runs.flatMap(x => x.pts.map(p => p?.v)).filter(v => v != null);
+  const sc = RG_SCALE[TV.id] || {};
+  const lo = sc.lo ?? (all.length ? Math.min(...all) : 0), hi = sc.hi ?? (all.length ? Math.max(...all) : 1);
+  const n = TREND_RAMP.length;
+  const shade = v => {
+    let f = hi > lo ? (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo) : 0;
+    if (sc.invert) f = 1 - f;
+    const k = Math.round(f * (n - 1));
+    return { bg: TREND_RAMP[k], fg: k >= 6 ? "#fff" : "#0b0b0b" };
+  };
+  const dayAlt = t => t.getUTCDate() % 2 === 0 ? "day-alt" : "";
+  const km = { d5: "0.85", d6: "2.6", d3: "2.6", d2: "7.7", d1: "23" };
+  const runName = d => `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })} ${p2(d.getUTCHours())}Z`;
+  const head = hourHeads({ hours }, "Valid UTC", `Local (${offLabel(S.off)})`, i => dayAlt(hours[i]));
+  const body = runs.map(r => el("tr", {}, el("th", {}, runName(r.run)),
+    r.pts.map((p, i) => {
+      if (!p || p.v == null) return el("td", { class: dayAlt(hours[i]) }, el("div", { class: "cell empty" }));
+      const c = TV.dir ? { bg: "var(--surface-2)", fg: "var(--ink)" } : shade(p.v), lead = Math.round((hours[i] - r.run) / 3600e3);
+      const sub = TV.id === "ws" && p.wd != null ? `${fmtDir(p.wd)}°` : TV.dir && p.ws != null ? `${Math.round(p.ws)} kt` : null;
+      const title = `${runName(r.run)} run · valid ${fmtDayBoth(hours[i])} · +${lead} h · ${km[p.dom] || p.dom} km grid · ${TV.fmt(p.v)} ${TV.unit}${p.interp ? " (interpolated)" : ""}`;
+      return el("td", { class: dayAlt(hours[i]) },
+        el("div", { class: `cell ${p.interp ? "interp" : ""}`, style: `background:${c.bg};color:${c.fg}`, title, "aria-label": title },
+          TV.dir ? el("span", {}, el("span", { class: "arrow", style: `transform:rotate(${p.v}deg)` }, "↓"), TV.fmt(p.v)) : TV.fmt(p.v),
+          sub ? el("small", {}, sub) : null));
+    })));
+  $("runGridTitle").textContent = `${TV.label} (${TV.unit}) from each AMPS run`;
+  $("runGridNote").textContent = `Each row is one run, newest at the bottom; columns are the next ${RG_H} h at ${RG_STEP}-hourly times, with alternate days shaded. ` +
+    (TV.id === "ws" ? "Cells show sustained wind with direction underneath (AMPS output here has no gusts). " : "") +
+    (TV.dir ? "Cells show direction (from) with an arrow pointing downwind, and speed underneath; they aren't shaded. " : "") +
+    "Hover or tap a cell for the run, lead time and grid. Empty cells: that run doesn't reach that time.";
+  $("runGrid").replaceChildren(el("thead", {}, head), el("tbody", {}, body));
+  if (TV.dir) {
+    $("runGridKey").replaceChildren(el("span", {}, "Arrow points the way the wind is blowing (downwind); the number is the direction it blows from, with speed underneath."));
+    return;
+  }
+  const rampCells = sc.invert ? [...TREND_RAMP].reverse() : TREND_RAMP;
+  $("runGridKey").replaceChildren(el("span", {}, TV.label), el("span", { class: "ramp" }, rampCells.map(c => el("span", { style: `background:${c}` }))),
+    el("span", {}, `${TV.fmt(lo)} → ${TV.fmt(hi)} ${TV.unit}${sc.hi != null && TV.id !== "vis" && TV.id !== "cb" ? " or more" : ""}`));
+}
+
+function renderWindowed() { renderChart(); renderOps(); renderBlsn(); renderHourTable(); }
+
+function renderWindowTabs() {
+  const W = WINDOWS.find(w => w.id === S.win);
+  $("wins").replaceChildren(...WINDOWS.map(w => el("button", {
+    "aria-pressed": String(w.id === S.win),
+    onclick: () => {
+      S.win = w.id; renderWindowTabs(); renderWindowed();
+      document.querySelectorAll(".tbl-wrap").forEach(t => { t.scrollLeft = 0; }); // new window starts at its first column
+    },
+  }, w.label)));
+  // other sections follow the Forecast tabs; badge them when they're not showing the next 24 h
+  for (const b of document.querySelectorAll(".win-badge")) {
+    b.hidden = W.id === "0";
+    b.textContent = `${W.label} · set in Forecast tabs`;
+  }
+  $("winNote").textContent = W.id === "0" ? "next 24 h with the last 6 h of observations"
+    : W.step > 1 ? "every 6 h to 96 h · grids show the worst hour in each 6 h block"
+    : `${W.from}–${W.to} h ahead`;
+}
+
+function renderVarButtons() {
+  $("vars").replaceChildren(...VARS.map(v => el("button", {
+    "aria-pressed": String(v.id === S.varId),
+    onclick: () => { S.varId = v.id; renderVarButtons(); renderChart(); renderHourTable(); },
+  }, v.label)));
+}
+
+function renderChart() {
+  const D = view(), V = VARS.find(v => v.id === S.varId), box = $("chart");
+  const W = Math.max(320, box.clientWidth || 800), H = W < 600 ? 240 : 320;
+  const m = { l: 54, r: 14, t: 12, b: 50 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const visible = D.series.filter(s => !S.hidden.has(s.id));
+  const obs = (S.hidden.has("obs") ? [] : metarObs()).map(o => ({ t: new Date(o.obsTime * 1000), v: obsValue(o, V.id) }))
+    .filter(o => o.v != null && o.t >= D.hours[0] && o.t <= D.hours[D.hours.length - 1]);
+  let vals = visible.flatMap(s => s.rows.map(r => valueOf(r, V))).concat(obs.map(o => o.v)).filter(v => v != null);
+  if (V.ceil != null) vals = vals.map(v => Math.min(v, V.ceil));
+  let lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
+  if (V.floor != null) lo = Math.min(lo, V.floor);
+  if (V.ceil != null && hi > V.ceil * 0.6) hi = V.ceil;
+  if (hi - lo < 1) { hi += 0.5; lo -= 0.5; }
+  // wind and gust axes step every 5 kt; other variables get "nice" steps
+  const ticks = V.dir ? DIR_TICKS : V.unit === "kt" ? fixedTicks(lo, hi, 5) : niceTicks(lo, hi, 5); lo = ticks[0]; hi = ticks[ticks.length - 1];
+  const t0 = D.hours[0].getTime(), t1 = D.hours[D.hours.length - 1].getTime();
+  const x = t => m.l + (t - t0) / (t1 - t0) * iw, y = v => m.t + ih - (Math.min(v, hi) - lo) / (hi - lo) * ih;
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${V.label} forecast by model, ${D.win.label}` });
+  const yl = svgEl("text", { x: 0, y: 0, "text-anchor": "middle", transform: `translate(12 ${m.t + ih / 2}) rotate(-90)`, style: "fill:var(--ink-2);font-size:12px" });
+  yl.textContent = `${V.label} (${V.unit})`; svg.append(yl);
+  for (const tv of ticks) {
+    svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(tv), y2: y(tv), stroke: "var(--grid)", "stroke-width": 1 }));
+    const tx = svgEl("text", { x: m.l - 6, y: y(tv) + 4, "text-anchor": "end" }); tx.textContent = V.dir ? dirTickLabel(tv) : Number.isInteger(tv) && V.id !== "visibility" ? String(tv) : V.fmt(tv); svg.append(tx);
+  }
+  const step = D.win.step > 1 ? (W < 600 ? 2 : 1) : (W < 600 ? 6 : 3);
+  D.hours.forEach((t, i) => {
+    if (i % step) return;
+    const tz = svgEl("text", { x: x(t.getTime()), y: H - m.b + 16, "text-anchor": "middle", style: "fill:var(--ink-2)" });
+    tz.textContent = hhZ(t); svg.append(tz);
+    const tl = svgEl("text", { x: x(t.getTime()), y: H - m.b + 29, "text-anchor": "middle" });
+    tl.textContent = hhL(t); svg.append(tl);
+  });
+  // Line 3: UTC date at each midnight (with a tick), plus the opening date when there's room before the first midnight
+  const dayLabel = (px, t, anchor) => {
+    const d = svgEl("text", { x: px, y: H - m.b + 44, "text-anchor": anchor, style: "fill:var(--ink-2);font-weight:600" });
+    d.textContent = fmtDay(t); svg.append(d);
+  };
+  const firstMid = new Date(Date.UTC(D.hours[0].getUTCFullYear(), D.hours[0].getUTCMonth(), D.hours[0].getUTCDate() + 1));
+  if (D.hours[0].getUTCHours() === 0) dayLabel(x(t0), D.hours[0], "start");
+  else if (x(firstMid.getTime()) - x(t0) >= 70 || firstMid.getTime() > t1) dayLabel(x(t0), D.hours[0], "start");
+  for (let t = firstMid.getTime(); t <= t1; t += 86400e3) {
+    svg.append(svgEl("line", { x1: x(t), x2: x(t), y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1, "stroke-dasharray": "2 4" }));
+    svg.append(svgEl("line", { x1: x(t), x2: x(t), y1: m.t + ih, y2: m.t + ih + 5, stroke: "var(--ink-2)", "stroke-width": 1 }));
+    dayLabel(Math.min(x(t) + 3, W - m.r - 40), new Date(t), "start");
+  }
+  // flight-condition thresholds on the cloud-base chart
+  if (V.id === "cloud_base") for (const [ft, lbl] of [[OPS.red.cloudFt, "red below"], [OPS.green.cloudFt, "green at/above"]]) {
+    if (ft < lo || ft > hi) continue;
+    svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(ft), y2: y(ft), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "5 4", opacity: 0.7 }));
+    const t = svgEl("text", { x: W - m.r - 2, y: y(ft) - 4, "text-anchor": "end", style: "fill:var(--ink-2)" });
+    t.textContent = `${ft} ft · ${lbl}`; svg.append(t);
+  }
+  // past shading + now line
+  if (D.nowIdx >= 0) {
+    const xn = x(D.now.getTime());
+    if (xn > m.l) svg.append(svgEl("rect", { x: m.l, y: m.t, width: xn - m.l, height: ih, fill: "var(--surface-2)", opacity: 0.6 }));
+    svg.append(svgEl("line", { x1: xn, x2: xn, y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1, "stroke-dasharray": "3 3" }));
+    const nl = svgEl("text", { x: xn + 4, y: m.t + 10 }); nl.textContent = "now"; svg.append(nl);
+  }
+  svg.append(svgEl("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1 }));
+  // model lines (gaps where a model has no value)
+  for (const s of visible) {
+    // join points up to 3 h apart (coarser AMPS domains are 3-hourly); longer gaps break the line
+    let d = "", lastI = null, lastV = null;
+    s.rows.forEach((r, i) => {
+      const v = valueOf(r, V);
+      if (v == null) return;
+      const join = lastI != null && i - lastI <= 3 && !(V.dir && dirWraps(lastV, v));
+      d += `${join ? "L" : "M"}${x(D.hours[i].getTime()).toFixed(1)},${y(v).toFixed(1)}`; lastI = i; lastV = v;
+    });
+    if (d) svg.append(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  }
+  // observations
+  for (const o of obs) svg.append(svgEl("circle", { cx: x(o.t.getTime()), cy: y(o.v), r: 4, fill: "var(--obs)", stroke: "var(--surface)", "stroke-width": 2 }));
+  // crosshair
+  const cross = svgEl("line", { y1: m.t, y2: m.t + ih, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" });
+  svg.append(cross);
+  const hit = svgEl("rect", { x: m.l, y: 0, width: iw, height: H, fill: "transparent", tabindex: 0 });
+  svg.append(hit);
+  const tip = el("div", { class: "tip" });
+  const show = i => {
+    const t = D.hours[i], cx = x(t.getTime());
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    const near = obs.filter(o => Math.abs(o.t - t) <= 1800e3).pop();
+    tip.replaceChildren(...[el("div", { class: "t" }, `${fmtDayBoth(t)} · ${V.label} ${V.unit}`),
+      near ? el("div", { class: "row" }, el("span", { class: "dot", style: "display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--obs);margin:0 3px 0 4px" }), el("b", {}, V.fmt(near.v)), el("span", { class: offsite() ? "offsite" : "" }, offsite() ? `Observed (${obsStation()})` : "Observed")) : null,
+      ...visible.map(s => {
+        const r = s.rows[i], v = valueOf(r, V);
+        const dk = V.id === "wind_speed_2000ft" ? "wind_direction_2000ft" : "wind_direction_10m";
+        const dir = V.id.startsWith("wind") && !V.dir && V.id !== "wind_gusts_10m" && r?.[dk] != null ? ` ${String(Math.round(r[dk])).padStart(3, "0")}°` : "";
+        return el("div", { class: "row" }, el("span", { class: "key", style: `border-color:${s.color};margin-right:0` }),
+          el("b", {}, v == null ? "—" : V.fmt(v) + dir), el("span", {}, s.label));
+      })].filter(Boolean));
+    tip.style.display = "block";
+    const bw = box.clientWidth, px = cx / W * bw;
+    tip.style.left = `${px + 190 > bw ? Math.max(0, px - 190) : px + 12}px`; tip.style.top = "8px";
+  };
+  const hide = () => { tip.style.display = "none"; cross.setAttribute("visibility", "hidden"); };
+  const idxAt = evt => {
+    const r = svg.getBoundingClientRect(), px = (evt.clientX - r.left) / r.width * W;
+    return Math.max(0, Math.min(D.hours.length - 1, Math.round((px - m.l) / iw * (D.hours.length - 1))));
+  };
+  let kIdx = Math.max(0, D.nowIdx);
+  hit.addEventListener("pointermove", e => show(idxAt(e)));
+  hit.addEventListener("pointerdown", e => show(idxAt(e)));
+  hit.addEventListener("pointerleave", hide);
+  hit.addEventListener("focus", () => show(kIdx));
+  hit.addEventListener("blur", hide);
+  hit.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") kIdx = Math.min(D.hours.length - 1, kIdx + 1);
+    else if (e.key === "ArrowLeft") kIdx = Math.max(0, kIdx - 1); else return;
+    e.preventDefault(); show(kIdx);
+  });
+  box.replaceChildren(svg, tip);
+
+  const setHidden = ids => { S.hidden = new Set(ids); renderChart(); };
+  $("legend").replaceChildren(
+    el("span", { class: "legend-all" },
+      el("button", { class: "mini", onclick: () => setHidden([]) }, "Select all"),
+      el("button", { class: "mini", onclick: () => setHidden([...D.series.map(s => s.id), "obs"]) }, "Deselect all")),
+    ...D.series.map(s => el("span", { class: "legend-item" },
+      el("button", {
+        "aria-pressed": String(!S.hidden.has(s.id)), title: "Show / hide",
+        onclick: () => { S.hidden.has(s.id) ? S.hidden.delete(s.id) : S.hidden.add(s.id); renderChart(); },
+      }, el("span", { class: "key", style: `border-color:${s.color}` }), s.label),
+      el("button", { class: "only", title: `Show only ${s.label}`, "aria-label": `Show only ${s.label}`,
+        onclick: () => setHidden([...D.series.filter(x => x.id !== s.id).map(x => x.id), "obs"]) }, "only"))),
+    el("span", { class: "legend-item" },
+      el("button", {
+        "aria-pressed": String(!S.hidden.has("obs")), title: "Show / hide",
+        onclick: () => { S.hidden.has("obs") ? S.hidden.delete("obs") : S.hidden.add("obs"); renderChart(); },
+      }, el("span", { class: "dot" }), "Observed", offsite() ? offsiteBadge() : obsStation() ? ` (${obsStation()})` : ""),
+      el("button", { class: "only", title: "Show only observations", "aria-label": "Show only observations",
+        onclick: () => setHidden(D.series.map(x => x.id)) }, "only")));
+
+  const missing = D.series.filter(s => s.rows.every(r => valueOf(r, V) == null))
+    .map(s => s.src === "amps" && s.rows.every(r => r == null) && !s.missing ? `${s.label} (beyond the end of its run)` : s.label);
+  const notes = [];
+  if (missing.length) notes.push(`No ${V.label.toLowerCase()} from: ${missing.join(", ")}.`);
+  if (Math.abs(D.loc.lat) > 89.5 && V.id.startsWith("wind")) notes.push("Near the pole, AMPS wind directions are grid (relative to the Greenwich meridian); other models' directions are poorly defined here.");
+  $("chartNote").textContent = notes.join(" ");
+  $("varHelp").replaceChildren(el("dt", {}, `${V.label} (${V.unit})`), el("dd", {}, VAR_HELP[V.id]));
+}
+
+function fixedTicks(lo, hi, step) {
+  const out = [];
+  for (let v = Math.floor(lo / step) * step; v < hi + step - 1e-9; v += step) out.push(v);
+  if (out.length < 2) out.push(out[0] + step);
+  return out;
+}
+
+function niceTicks(lo, hi, n) {
+  const span = hi - lo, raw = span / n, mag = 10 ** Math.floor(Math.log10(raw));
+  const stepv = [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => span / s <= n) || 10 * mag;
+  const out = []; for (let v = Math.floor(lo / stepv) * stepv; v <= hi + 1e-9; v += stepv) out.push(+v.toFixed(6));
+  if (out[out.length - 1] < hi) out.push(out[out.length - 1] + stepv);
+  return out;
+}
+
+// Header rows: UTC (Z), local (L), then the UTC date wherever it changes
+function hourHeads(D, firstZ, firstL, cls = () => "") {
+  const dates = [];
+  D.hours.forEach((t, i) => {
+    if (i === 0 || t.getUTCDate() !== D.hours[i - 1].getUTCDate()) dates.push({ t, span: 1 });
+    else dates.at(-1).span++;
+  });
+  return [
+    el("tr", {}, el("th", {}, firstZ), D.hours.map((t, i) => el("th", { class: cls(i) }, hhZ(t)))),
+    el("tr", { class: "lrow" }, el("th", {}, firstL), D.hours.map((t, i) => el("th", { class: cls(i) }, hhL(t)))),
+    el("tr", { class: "drow" }, el("th", {}, "Date (Z)"), dates.map(d => el("th", { colspan: d.span }, d.span >= 2 || dates.length === 1 ? fmtDay(d.t) : String(d.t.getUTCDate())))),
+  ];
+}
+
+function opsCell(D, si, i, content, cls, elem) {
+  return el("td", { class: i === D.nowIdx ? "nowcol" : "" },
+    el("div", { class: `c ${cls}`, "data-m": si, "data-h": i, "data-e": elem }, ...content));
+}
+
+function renderOps() {
+  const D = view();
+  const head = hourHeads(D, "UTC", `Local (${offLabel(S.off)})`, i => i === D.nowIdx ? "nowcol" : "");
+  const rows = D.series.map((s, si) => el("tr", {}, el("td", {}, el("span", { class: "key", style: `border-color:${s.color}` }), s.label),
+    s.rows.map((_, i) => {
+      const o = opsCategory(cellRow(s, i, r => opsCategory(r)?.cat).row);
+      return opsCell(D, si, i, [o ? OPSCAT[o.cat].icon : "–"], o ? OPSCAT[o.cat].cls : "nd", "ops");
+    })));
+  $("ops").replaceChildren(el("thead", {}, head), el("tbody", {}, rows));
+  renderElementGrids();
+}
+
+function renderElementGrids() {
+  const D = view();
+  $("elemGrids").replaceChildren(...ELEMENTS.map(E => {
+    const [g, y, r] = E.key();
+    const head = hourHeads(D, "UTC", `Local (${offLabel(S.off)})`, i => i === D.nowIdx ? "nowcol" : "");
+    const rows = D.series.map((s, si) => el("tr", {}, el("td", {}, el("span", { class: "key", style: `border-color:${s.color}` }), s.label),
+      s.rows.map((_, i) => {
+        const row = cellRow(s, i, r => E.evaluate(r)?.cat).row, v = row && E.evaluate(row);
+        return opsCell(D, si, i, v ? [v.cell, v.sub ? el("small", {}, v.sub) : null] : ["–"], v ? OPSCAT[v.cat].cls : "nd", E.id);
+      })));
+    const unit = { vis: "km", precip: "mm/h", cloud: "base in hundreds of ft · AMPS model base, others from forecast soundings", wind: "kt, gust below", temp: "°C" }[E.id];
+    return el("div", { class: "card tbl-wrap elem-card" },
+      el("h3", {}, E.label, el("span", { class: "run" }, unit),
+        D.win.id !== "0" ? el("span", { class: "win-badge", style: "margin-left:8px" }, `${D.win.label} · set in Forecast tabs`) : null),
+      el("div", { class: "elem-key" },
+        el("span", { class: "risk g" }, el("i", {}, "✓"), g),
+        y ? el("span", { class: "risk r1" }, el("i", {}, "!"), y) : null,
+        el("span", { class: "risk r3" }, el("i", {}, "✕"), r)),
+      el("table", { class: "heat wide" }, el("thead", {}, head), el("tbody", {}, rows)));
+  }));
+}
+
+// One floating tooltip for every flight-condition cell: all element values for that model and hour
+function gridTipFor(cell) {
+  const D = view(), s = D.series[+cell.dataset.m], i = +cell.dataset.h;
+  const E = ELEMENTS.find(e => e.id === cell.dataset.e);
+  const { row, off } = cellRow(s, i, E ? r => E.evaluate(r)?.cat : r => opsCategory(r)?.cat);
+  const t = new Date(D.hours[i].getTime() + off * 3600e3);
+  const o = opsCategory(row);
+  const kids = [el("div", { class: "t" }, `${s.label} · ${fmtDayBoth(t)}`)];
+  if (s.blocks) kids.push(el("div", { class: "t" }, `Worst hour${E ? ` for ${E.label.toLowerCase()}` : ""} in ${hhZ(D.hours[i])}–${hhZ(new Date(D.hours[i].getTime() + (D.win.step - 1) * 3600e3))}`));
+  if (!o) kids.push(el("div", { class: "na" }, "No data for this hour"));
+  else {
+    for (const { e, v } of o.els) kids.push(el("div", { class: "row" },
+      el("span", { class: `sw ${v ? OPSCAT[v.cat].cls : "nd"}` }, v ? OPSCAT[v.cat].icon : ""),
+      el("span", {}, e.label), v ? el("b", {}, v.text) : el("span", { class: "na" }, "not available")));
+    kids.push(el("div", { class: "overall" }, `Overall: ${OPSCAT[o.cat].label}${o.why.length ? " — " + o.why.join(", ") : ""}`));
+  }
+  return kids;
+}
+(function wireGridTip() {
+  const tip = el("div", { id: "gridTip", role: "tooltip" });
+  document.body.append(tip);
+  const show = cell => {
+    tip.replaceChildren(...gridTipFor(cell)); tip.style.display = "block";
+    const r = cell.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    let left, top;
+    if (r.right + 8 + tw <= innerWidth - 8) { left = r.right + 8; top = r.top - 8; }          // right of the cell
+    else if (r.left - 8 - tw >= 8) { left = r.left - 8 - tw; top = r.top - 8; }               // left of the cell
+    else {                                                                                      // narrow screen: below or above
+      left = r.left + r.width / 2 - tw / 2;
+      top = r.bottom + 8 + th <= innerHeight - 8 ? r.bottom + 8 : r.top - 8 - th;
+    }
+    tip.style.left = `${clamp(left, 8, innerWidth - tw - 8)}px`;
+    tip.style.top = `${clamp(top, 8, innerHeight - th - 8)}px`;
+  };
+  const hide = () => { tip.style.display = "none"; };
+  document.addEventListener("pointerover", e => { const c = e.target.closest?.(".c[data-m]"); c ? show(c) : hide(); });
+  document.addEventListener("pointerdown", e => { const c = e.target.closest?.(".c[data-m]"); c ? show(c) : hide(); });
+  addEventListener("scroll", hide, { passive: true });
+})();
+
+function renderBlsn() {
+  const D = view();
+  const head = hourHeads(D, "UTC", `Local (${offLabel(S.off)})`, i => i === D.nowIdx ? "nowcol" : "");
+  const rows = D.series.map(s => el("tr", {}, el("td", {}, el("span", { class: "key", style: `border-color:${s.color}` }), s.label),
+    s.rows.map((_, i) => {
+      const bl = r => blsnRisk(r.wind_speed_10m, r.wind_gusts_10m, r.temperature_2m);
+      const { row: r, off } = cellRow(s, i, bl);
+      const risk = r ? bl(r) : null;
+      const t = new Date(D.hours[i].getTime() + off * 3600e3);
+      const title = risk == null ? "No data" : `${fmtDayBoth(t)} · ${RISK[risk].label} · ${Math.round(r.wind_speed_10m)} kt, ${r.temperature_2m.toFixed(1)} °C`;
+      return el("td", { class: i === D.nowIdx ? "nowcol" : "" },
+        el("div", { class: `c ${risk == null ? "nd" : risk ? RISK[risk].cls : ""}`, title, "aria-label": title }, risk == null ? "–" : risk ? RISK[risk].icon : ""));
+    })));
+  $("blsn").replaceChildren(el("thead", {}, head), el("tbody", {}, rows));
+}
+
+function renderHourTable() {
+  const D = view(), V = VARS.find(v => v.id === S.varId);
+  $("tableVar").textContent = `· ${V.label} (${V.unit}), every model and the observations`;
+  const obsByHour = {};
+  for (const o of metarObs()) { const t = new Date(o.obsTime * 1000); t.setUTCMinutes(t.getUTCMinutes() + 30, 0, 0); t.setUTCMinutes(0); const v = obsValue(o, V.id); if (v != null) obsByHour[hourKey(t)] = v; }
+  const head = hourHeads(D, "UTC", `Local (${offLabel(S.off)})`, i => i === D.nowIdx ? "nowcol" : "");
+  const obsRow = el("tr", {}, el("td", {}, el("span", { class: "dot", style: "display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--obs);margin-right:10px" }), "Observed", offsite() ? offsiteBadge() : null),
+    D.hours.map(t => { const v = obsByHour[hourKey(t)]; return el("td", { class: v == null ? "na" : "" }, v == null ? "" : V.fmt(v)); }));
+  const rows = D.series.map(s => el("tr", {}, modelCell(s), s.rows.map(r => {
+    const v = valueOf(r, V); return el("td", { class: v == null ? "na" : "" }, v == null ? "—" : V.fmt(v));
+  })));
+  $("hourTable").replaceChildren(el("thead", {}, head), el("tbody", {}, obsRow, rows));
+}
+
+// ---------- wiring ----------
+$("loc").addEventListener("change", e => {
+  const v = e.target.value;
+  $("custom").classList.toggle("on", v === "custom");
+  if (v === "custom") { $("lat").focus(); return; }
+  S.loc = S.locs.find(l => l.id === v);
+  try { localStorage.setItem("afc.loc", v); } catch {}
+  load();
+});
+$("go").addEventListener("click", () => {
+  const lat = parseFloat($("lat").value), lon = parseFloat($("lon").value);
+  if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 360)) { $("meta").replaceChildren(el("span", { class: "err" }, "Enter a valid latitude (−90…90) and longitude.")); return; }
+  // reuse a pre-set site (and its AMPS/obs) if the point is within ~2 km of one
+  const near = S.locs.find(l => Math.hypot(l.lat - lat, (l.lon - lon) * Math.cos(lat * Math.PI / 180)) * 111.2 < 2);
+  S.loc = near || { id: "custom", custom: true, name: `Custom point`, lat, lon, metar: null, taf: null };
+  load();
+});
+for (const id of ["lat", "lon"]) $(id).addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); });
+// UTC-offset selector: default to the current NZ offset (McMurdo keeps NZ time), remembered per viewer
+(function initOffset() {
+  const sel = $("off");
+  for (let o = -12; o <= 14; o++) sel.append(el("option", { value: o }, offLabel(o)));
+  let saved = null;
+  try { saved = localStorage.getItem("afc.off"); } catch {}
+  if (saved != null && !isNaN(+saved)) S.off = +saved;
+  else {
+    const nz = new Intl.DateTimeFormat("en", { timeZone: "Pacific/Auckland", timeZoneName: "shortOffset" }).formatToParts(new Date()).find(p => p.type === "timeZoneName")?.value;
+    const m = nz && nz.match(/GMT([+-]\d+)/); if (m) S.off = +m[1];
+  }
+  sel.value = S.off;
+  const set = o => {
+    S.off = Math.max(-12, Math.min(14, o)); sel.value = S.off;
+    try { localStorage.setItem("afc.off", S.off); } catch {}
+    render();
+  };
+  sel.addEventListener("change", () => set(+sel.value));
+})();
+$("refresh").addEventListener("click", load);
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (S.data) { renderChart(); renderTrend(); } }, 120); });
+// The flight-condition and blowing-snow grids share column widths; scroll them sideways together so hours stay aligned
+let syncing = false;
+document.addEventListener("scroll", e => {
+  const w = e.target;
+  if (syncing || !(w instanceof Element) || !w.matches(".tbl-wrap") || !w.querySelector("table.heat.wide")) return;
+  syncing = true;
+  document.querySelectorAll(".tbl-wrap").forEach(o => { if (o !== w && o.querySelector("table.heat.wide")) o.scrollLeft = w.scrollLeft; });
+  requestAnimationFrame(() => { syncing = false; });
+}, true);
+$("trendModel").addEventListener("change", e => { S.trendModel = e.target.value; renderTrend(); });
+
+window.afcRefresh = () => load(); // pull-to-refresh in the app
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && S.data && Date.now() - S.data.loaded > 10 * 60e3) load();
+});
+
+loadLocations().then(load);
+</script>
+<dialog id="modelInfo" aria-label="Model information">
+  <button class="mi-close" aria-label="Close" onclick="this.closest('dialog').close()">✕</button>
+  <div class="mi-body"></div>
+</dialog>
+<script>
+  // click outside the panel closes it
+  document.getElementById("modelInfo").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+</script>
+</body>
+</html>
