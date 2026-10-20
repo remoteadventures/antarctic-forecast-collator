@@ -3,7 +3,7 @@
 Downloads only the needed GRIB records via HTTP byte ranges using the .idx files.
 Usage: python amps_point.py [RUN=YYYYMMDDHH|latest] [DOMAIN=d5] [LAT LON]
 """
-import csv, math, re, sys, urllib.request
+import csv, http.client, math, re, sys, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import eccodes
@@ -27,12 +27,19 @@ FIELDS = [
 ]
 
 
-def get(url, rng=None):
+def get(url, rng=None, attempts=4):
+    """GET (optionally a byte range), retrying timeouts and connection errors: UCAR's server is sometimes slow."""
     h = dict(UA)
     if rng:
         h["Range"] = f"bytes={rng[0]}-{rng[1]}"
-    with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60) as r:
-        return r.read()
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60) as r:
+                return r.read()
+        except (OSError, http.client.HTTPException) as e:  # URLError, timeouts and resets are OSErrors
+            if attempt == attempts - 1 or (isinstance(e, urllib.error.HTTPError) and e.code < 500):
+                raise
+            time.sleep(5 * (attempt + 1))
 
 
 def listing(url):

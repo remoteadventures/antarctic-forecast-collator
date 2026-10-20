@@ -146,27 +146,45 @@ def main():
         level_fields = [(f"{k}{l}", var, f"{l} mb") for l in need for k, var in (("u", "UGRD"), ("v", "VGRD"), ("z", "HGT"))]
         print(f"{dom}: {', '.join(points)} ({len(hours)} hours; 2000 ft wind from {need} hPa)", file=sys.stderr)
 
+        def pick(grid):
+            """Keep just this domain's site values: whole grids for every hour don't fit in a CI runner's memory."""
+            return None if grid is None else {lid: float(grid[pt[0]]) for lid, pt in points.items()}
+
+        failures = []
+
+        def record(stem, rec):
+            """One field's site values; a record that still fails after retries is left blank, not fatal."""
+            if rec is None:
+                return None
+            try:
+                return pick(fetch_record(stem + ".grb", rec))
+            except Exception as e:
+                failures.append(f"{stem.rsplit('/', 1)[-1]} {rec['var']} {rec['level']}: {e}")
+                return None
+
         def fetch_hour(fh):
             stem = f"{BASE}/{run}/{run}_WRF_{dom}_f{fh:03d}"
             recs = parse_idx(get(stem + ".idx").decode())
-            vals = {}
-            for name, var, lev in FIELDS + level_fields:
-                rec = next((r for r in recs if r["var"] == var and r["level"] == lev), None)
-                vals[name] = fetch_record(stem + ".grb", rec) if rec else None
+            vals = {name: record(stem, next((r for r in recs if r["var"] == var and r["level"] == lev), None))
+                    for name, var, lev in FIELDS + level_fields}
             step = 1 if dom in ("d3", "d5", "d6") else 3
-            rec = next((r for r in recs if r["var"] == "APCP" and r["desc"] == f"{fh-step}-{fh}hr acc"), None)
-            vals["pcp"] = fetch_record(stem + ".grb", rec) if rec else None
+            vals["pcp"] = record(stem, next((r for r in recs if r["var"] == "APCP" and r["desc"] == f"{fh-step}-{fh}hr acc"), None))
             return fh, step, vals
 
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=6) as pool:
             results = list(pool.map(fetch_hour, hours))
+        total = len(hours) * (len(FIELDS) + len(level_fields) + 1)
+        if failures:
+            print(f"{dom}: {len(failures)} of {total} records failed after retries, left blank; first: {failures[0]}", file=sys.stderr)
+        if len(failures) > 0.1 * total:
+            raise SystemExit(f"{dom}: too many failed downloads ({len(failures)}/{total}); UCAR may be down")
 
         for lid, (i, dist, dx, theta, dir_ref) in points.items():
             series = []
             for fh, step, v in results:
                 if v["u10"] is None or v["t2"] is None:
                     continue
-                at = lambda k: None if v[k] is None else float(v[k][i])
+                at = lambda k: None if v[k] is None else v[k][lid]
                 ug, vg = at("u10"), at("v10")
                 ue, ve = ug * math.sin(theta) - vg * math.cos(theta), ug * math.cos(theta) + vg * math.sin(theta)
                 t2 = at("t2")
